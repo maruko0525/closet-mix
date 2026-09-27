@@ -55,7 +55,7 @@ label{font-size:12px;color:var(--muted);font-weight:700}.preview{width:100%;aspe
   <label>品番 / JAN / バーコード</label><input id="code" placeholder="251JAB80-2281 / 609000026524">
   <label>メモ</label><textarea id="memo" rows="2" placeholder="20%OFF、オーバーサイズなど"></textarea>
   <button class="dark" style="width:100%" onclick="saveItem()">この服を登録する</button>
-  <p class="notice">服の写真を選んで「AIで写真を解析」を押すと、ブランド・カテゴリ・色・サイズ・価格・品番/JANなど、画像から確認できた項目を自動入力します。確認できない項目は空欄のままです。</p>
+  <p class="notice">服の写真を選んで「AIで写真を解析」を押すと、画像から確認できた項目を自動入力します。</p>
  </div>
 </section>
 
@@ -74,36 +74,43 @@ label{font-size:12px;color:var(--muted);font-weight:700}.preview{width:100%;aspe
 let mode='candidate';
 let items=JSON.parse(localStorage.getItem('closetMixItems')||'[]');
 const $=id=>document.getElementById(id);
-function go(id){['home','add','closet'].forEach(x=>$(x).classList.toggle('hidden',x!==id)); if(id==='home') renderSummary(); if(id==='closet') renderItems(); scrollTo(0,0)}
+function go(id){['home','add','closet'].forEach(x=>$(x).classList.toggle('hidden',x!==id));if(id==='home')renderSummary();if(id==='closet')renderItems();scrollTo(0,0)}
 function setMode(m){mode=m;$('candBtn').className=m==='candidate'?'active':'light';$('ownBtn').className=m==='owned'?'active':'light'}
 $('photo').addEventListener('change',e=>{let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{$('preview').src=r.result;$('preview').style.display='block'};r.readAsDataURL(f)});
 function fileData(file){return new Promise(res=>{if(!file)return res('');let r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)})}
 const AI_API='https://closet-mix-api.kjkt100.workers.dev';
 function setIfPresent(id,value){if(value===undefined||value===null||value==='')return;$(id).value=String(value)}
 function normalizeCategory(value){
- const v=String(value||'').trim(); if(!v)return '';
- const opts=[...$('category').options].map(o=>o.value); if(opts.includes(v))return v;
+ const v=String(value||'').trim();if(!v)return '';
+ const opts=[...$('category').options].map(o=>o.value);if(opts.includes(v))return v;
  const m=[['Tシャツ',['tシャツ','tee','t-shirt','tshirt']],['シャツ',['シャツ','shirt']],['アウター',['アウター','ジャケット','コート','ブルゾン','outer','jacket','coat']],['パンツ',['パンツ','ズボン','デニム','ジーンズ','pants','trousers','jeans']],['スカート',['スカート','skirt']],['靴',['靴','シューズ','スニーカー','shoe','sneaker']],['バッグ',['バッグ','bag']]];
- const low=v.toLowerCase(); for(const [cat,keys] of m){if(keys.some(k=>low.includes(k.toLowerCase())))return cat} return 'その他';
+ const low=v.toLowerCase();for(const [cat,keys] of m){if(keys.some(k=>low.includes(k.toLowerCase())))return cat}return 'その他';
 }
 async function analyzeWithAI(){
  const clothes=await fileData($('photo').files[0]);
  if(!clothes){alert('先に服の写真を選んでください 📸');return}
  const tag=await fileData($('tagPhoto').files[0]);
- const btn=$('analyzeBtn'); btn.disabled=true; btn.textContent='AI解析中…'; $('aiStatus').textContent='写真を解析しています。少し待ってください。';
+ const btn=$('analyzeBtn');btn.disabled=true;btn.textContent='AI解析中…';$('aiStatus').textContent='写真を解析しています。少し待ってください。';
  try{
   const r=await fetch(AI_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clothesImage:clothes,tagImage:tag||''})});
   const data=await r.json().catch(()=>({}));
   if(!r.ok||!data.ok)throw new Error(data.error||data.details||('HTTP '+r.status));
   const a=data.analysis||{};
-  setIfPresent('brand',a.brand); if(a.category)$('category').value=normalizeCategory(a.category); setIfPresent('color',a.color); setIfPresent('size',a.size);
+  setIfPresent('brand',a.brand);
+  if(a.category)$('category').value=normalizeCategory(a.category);
+  setIfPresent('color',a.color);setIfPresent('size',a.size);
   if(a.price!==undefined&&a.price!==null&&a.price!==''){const n=String(a.price).replace(/[^0-9]/g,'');if(n)$('price').value=n}
   setIfPresent('code',a.productCode||a.janCode);
   const extra=[a.material&&`素材: ${a.material}`,a.pattern&&`柄: ${a.pattern}`,a.season&&`季節: ${a.season}`,a.features,a.description].filter(Boolean).join(' / ');
   if(extra)$('memo').value=[$('memo').value,extra].filter(Boolean).join(' / ');
   $('aiStatus').textContent='AI解析できました ✨ 内容を確認してから登録してください。';
- }catch(e){console.error(e);$('aiStatus').textContent='AI解析に失敗しました: '+e.message;alert('AI解析に失敗しました。\n'+e.message)}
- finally{btn.disabled=false;btn.textContent='✨ AIで写真を解析'}
+ }catch(e){
+  console.error(e);
+  $('aiStatus').textContent='AI解析に失敗しました: '+e.message;
+  alert('AI解析に失敗しました。\n'+e.message);
+ }finally{
+  btn.disabled=false;btn.textContent='✨ AIで写真を解析';
+ }
 }
 async function saveItem(){
  let img=await fileData($('photo').files[0]);
@@ -121,20 +128,20 @@ function renderItems(){
 }
 function del(id){if(confirm('この服を削除しますか？')){items=items.filter(x=>x.id!==id);localStorage.setItem('closetMixItems',JSON.stringify(items));renderItems();renderSummary()}}
 function renderSummary(){
- let c=items.filter(x=>x.mode==='candidate'), total=c.reduce((s,x)=>s+x.price,0);
+ let c=items.filter(x=>x.mode==='candidate'),total=c.reduce((s,x)=>s+x.price,0);
  $('todaySummary').innerHTML=c.length?`<b>${c.length}点</b>の試着候補　合計 <b>${yen(total)}</b><br><span class="tiny">${c.slice(0,4).map(x=>esc(x.brand)+' '+esc(x.category)).join(' / ')}</span>`:'まだ商品がありません'
 }
 function makeCoordinate(){
  let c=items.filter(x=>x.mode==='candidate');
  if(c.length<2){$('coordinate').innerHTML='<p class="notice danger">候補を2点以上登録するとコーデできます。</p>';return}
  let chosen=[];let used=new Set();
- for(let x of c){if(!used.has(x.category)){chosen.push(x);used.add(x.category)} if(chosen.length>=4)break}
+ for(let x of c){if(!used.has(x.category)){chosen.push(x);used.add(x.category)}if(chosen.length>=4)break}
  if(chosen.length<2)chosen=c.slice(0,Math.min(4,c.length));
  let score=Math.min(96,72+chosen.length*6);
- $('coordinate').innerHTML=`<div class="card"><div class="score">${score}<small style="font-size:16px"> / 100</small></div><b>ブランド横断コーデ</b><p>${chosen.map(x=>esc(x.brand)+' '+esc(x.category)).join(' ＋ ')}</p><p class="notice">V1のスコアはカテゴリ構成によるデモ評価です。AI接続版では色・シルエット・季節・手持ち服との相性を評価します。</p></div>`
+ $('coordinate').innerHTML=`<div class="card"><div class="score">${score}<small style="font-size:16px"> / 100</small></div><b>ブランド横断コーデ</b><p>${chosen.map(x=>esc(x.brand)+' '+esc(x.category)).join(' ＋ ')}</p><p class="notice">V1のスコアはカテゴリ構成によるデモ評価です。</p></div>`
 }
 function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 renderSummary();
-if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
 </script>
-</body></html>
+</body>
+</html>
