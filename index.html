@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>CLOSET MIX</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+:root{--bg:#f5f5f3;--card:#fff;--ink:#151515;--muted:#737373;--line:#e7e5e4;--accent:#111827;--soft:#eeeef0}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:var(--ink)}
+header{position:sticky;top:0;z-index:5;background:rgba(245,245,243,.92);backdrop-filter:blur(12px);padding:calc(12px + env(safe-area-inset-top)) 16px 10px;border-bottom:1px solid var(--line)}
+.brand{font-size:21px;font-weight:900;letter-spacing:.08em}.sub{font-size:12px;color:var(--muted);margin-top:2px}
+main{max-width:760px;margin:auto;padding:14px 14px 100px}.hero{background:linear-gradient(145deg,#171717,#343434);color:white;border-radius:24px;padding:22px;box-shadow:0 12px 30px #0002}
+.hero h1{font-size:27px;margin:0 0 8px}.hero p{margin:0;color:#ddd;line-height:1.55}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+button,.btn{border:0;border-radius:16px;padding:14px 12px;font-weight:750;font-size:15px;cursor:pointer}.primary{background:#fff;color:#111}.dark{background:var(--accent);color:#fff}.light{background:#fff;border:1px solid var(--line);color:#222}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:15px;margin-top:14px}.card h2{font-size:18px;margin:0 0 12px}
+input,select,textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px;background:#fff;font-size:16px;margin:5px 0 9px}
+label{font-size:12px;color:var(--muted);font-weight:700}.preview{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:16px;background:#eee;display:none}
+.items{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.item{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:white}
+.item img{width:100%;aspect-ratio:1/1;object-fit:cover;background:#eee}.item .pad{padding:10px}.tiny{font-size:12px;color:var(--muted)}.price{font-weight:850;margin-top:5px}
+.badge{display:inline-block;padding:4px 8px;background:#f1f1f1;border-radius:99px;font-size:11px;margin:3px 3px 0 0}
+.tabs{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);display:grid;grid-template-columns:repeat(3,1fr);padding:8px 8px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);z-index:10}
+.tabs button{background:none;padding:8px 2px;font-size:12px}.tabs span{display:block;font-size:21px}.hidden{display:none!important}
+.empty{text-align:center;padding:24px;color:var(--muted)}.score{font-size:42px;font-weight:900}.row{display:flex;gap:8px}.row>*{flex:1}
+.notice{font-size:12px;color:var(--muted);line-height:1.45}.danger{color:#a11}.switch{display:flex;gap:7px;margin-bottom:10px}.switch button{flex:1;padding:10px}.active{background:#111827;color:white}
+</style>
+</head>
+<body>
+<header><div class="brand">CLOSET MIX</div><div class="sub">ブランドを越えて、服をひとつのクローゼットへ。</div></header>
+<main>
+<section id="home">
+ <div class="hero">
+  <h1>今日見つけた服を、<br>その場でコーデ。</h1>
+  <p>服とタグを撮影して候補へ追加。違う店・違うブランドでも自由に組み合わせよう。</p>
+  <div class="grid"><button class="primary" onclick="go('add')">📸 服を登録</button><button class="primary" onclick="go('closet')">👕 クローゼット</button></div>
+ </div>
+ <div class="card"><h2>🛍️ 今日の候補</h2><div id="todaySummary" class="empty">まだ商品がありません</div></div>
+ <div class="card"><h2>✨ クイックコーデ</h2><p class="notice">登録した候補から組み合わせを選び、簡易スコアを表示します。</p><button class="dark" style="width:100%" onclick="makeCoordinate()">コーデを作る</button><div id="coordinate"></div></div>
+</section>
+
+<section id="add" class="hidden">
+ <div class="card">
+  <h2>📸 商品を登録</h2>
+  <div class="switch"><button id="candBtn" class="active" onclick="setMode('candidate')">試着候補</button><button id="ownBtn" class="light" onclick="setMode('owned')">購入済み</button></div>
+  <label>① 服の写真</label><input id="photo" type="file" accept="image/*" capture="environment">
+  <img id="preview" class="preview">
+  <label>② タグ写真（試作版では保存用）</label><input id="tagPhoto" type="file" accept="image/*" capture="environment">
+  <label>ブランド</label><input id="brand" placeholder="例：AZUL / NIKE / URBAN RESEARCH">
+  <div class="row"><div><label>カテゴリ</label><select id="category"><option>Tシャツ</option><option>シャツ</option><option>アウター</option><option>パンツ</option><option>スカート</option><option>靴</option><option>バッグ</option><option>その他</option></select></div><div><label>色</label><input id="color" placeholder="L/GRY"></div></div>
+  <div class="row"><div><label>サイズ</label><input id="size" placeholder="M"></div><div><label>価格（税込）</label><input id="price" inputmode="numeric" placeholder="3990"></div></div>
+  <label>品番 / JAN / バーコード</label><input id="code" placeholder="251JAB80-2281 / 609000026524">
+  <label>メモ</label><textarea id="memo" rows="2" placeholder="20%OFF、オーバーサイズなど"></textarea>
+  <button class="dark" style="width:100%" onclick="saveItem()">この服を登録する</button>
+  <p class="notice">V1はGitHub Pagesだけで動くため、画像解析・JAN検索はまだ端末内で自動実行しません。次段階でAI/APIを接続できます。</p>
+ </div>
+</section>
+
+<section id="closet" class="hidden">
+ <div class="card"><h2>👕 MY CLOSET</h2><div id="items" class="items"></div></div>
+</section>
+</main>
+
+<nav class="tabs">
+<button onclick="go('home')"><span>🏠</span>ホーム</button>
+<button onclick="go('add')"><span>📷</span>登録</button>
+<button onclick="go('closet')"><span>👕</span>クローゼット</button>
+</nav>
+
+<script>
+let mode='candidate';
+let items=JSON.parse(localStorage.getItem('closetMixItems')||'[]');
+const $=id=>document.getElementById(id);
+function go(id){['home','add','closet'].forEach(x=>$(x).classList.toggle('hidden',x!==id)); if(id==='home') renderSummary(); if(id==='closet') renderItems(); scrollTo(0,0)}
+function setMode(m){mode=m;$('candBtn').className=m==='candidate'?'active':'light';$('ownBtn').className=m==='owned'?'active':'light'}
+$('photo').addEventListener('change',e=>{let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{$('preview').src=r.result;$('preview').style.display='block'};r.readAsDataURL(f)});
+function fileData(file){return new Promise(res=>{if(!file)return res('');let r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)})}
+async function saveItem(){
+ let img=await fileData($('photo').files[0]);
+ let tag=await fileData($('tagPhoto').files[0]);
+ let it={id:Date.now(),mode,img,tag,brand:$('brand').value||'ブランド未設定',category:$('category').value,color:$('color').value,size:$('size').value,price:Number(($('price').value||'0').replace(/,/g,'')),code:$('code').value,memo:$('memo').value,created:new Date().toISOString()};
+ items.unshift(it);
+ try{localStorage.setItem('closetMixItems',JSON.stringify(items))}catch(e){alert('画像が大きく保存容量を超えました。写真を減らして試してください。');items.shift();return}
+ ['brand','color','size','price','code','memo'].forEach(x=>$(x).value='');$('photo').value='';$('tagPhoto').value='';$('preview').style.display='none';
+ alert('登録しました 👕');go('closet')
+}
+function yen(n){return n?new Intl.NumberFormat('ja-JP',{style:'currency',currency:'JPY',maximumFractionDigits:0}).format(n):'価格未登録'}
+function renderItems(){
+ if(!items.length){$('items').innerHTML='<div class="empty" style="grid-column:1/-1">まだ服がありません</div>';return}
+ $('items').innerHTML=items.map(x=>`<div class="item">${x.img?`<img src="${x.img}">`:`<div style="aspect-ratio:1;background:#eee;display:grid;place-items:center;font-size:40px">👕</div>`}<div class="pad"><b>${esc(x.brand)}</b><div class="tiny">${esc(x.category)} ${esc(x.color||'')}</div><span class="badge">${x.mode==='candidate'?'試着候補':'購入済み'}</span>${x.size?`<span class="badge">${esc(x.size)}</span>`:''}<div class="price">${yen(x.price)}</div><button class="light" style="width:100%;margin-top:8px;padding:8px" onclick="del(${x.id})">削除</button></div></div>`).join('')
+}
+function del(id){if(confirm('この服を削除しますか？')){items=items.filter(x=>x.id!==id);localStorage.setItem('closetMixItems',JSON.stringify(items));renderItems();renderSummary()}}
+function renderSummary(){
+ let c=items.filter(x=>x.mode==='candidate'), total=c.reduce((s,x)=>s+x.price,0);
+ $('todaySummary').innerHTML=c.length?`<b>${c.length}点</b>の試着候補　合計 <b>${yen(total)}</b><br><span class="tiny">${c.slice(0,4).map(x=>esc(x.brand)+' '+esc(x.category)).join(' / ')}</span>`:'まだ商品がありません'
+}
+function makeCoordinate(){
+ let c=items.filter(x=>x.mode==='candidate');
+ if(c.length<2){$('coordinate').innerHTML='<p class="notice danger">候補を2点以上登録するとコーデできます。</p>';return}
+ let chosen=[];let used=new Set();
+ for(let x of c){if(!used.has(x.category)){chosen.push(x);used.add(x.category)} if(chosen.length>=4)break}
+ if(chosen.length<2)chosen=c.slice(0,Math.min(4,c.length));
+ let score=Math.min(96,72+chosen.length*6);
+ $('coordinate').innerHTML=`<div class="card"><div class="score">${score}<small style="font-size:16px"> / 100</small></div><b>ブランド横断コーデ</b><p>${chosen.map(x=>esc(x.brand)+' '+esc(x.category)).join(' ＋ ')}</p><p class="notice">V1のスコアはカテゴリ構成によるデモ評価です。AI接続版では色・シルエット・季節・手持ち服との相性を評価します。</p></div>`
+}
+function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+renderSummary();
+if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+</script>
+</body></html>
