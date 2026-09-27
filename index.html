@@ -46,14 +46,16 @@ label{font-size:12px;color:var(--muted);font-weight:700}.preview{width:100%;aspe
   <div class="switch"><button id="candBtn" class="active" onclick="setMode('candidate')">試着候補</button><button id="ownBtn" class="light" onclick="setMode('owned')">購入済み</button></div>
   <label>① 服の写真</label><input id="photo" type="file" accept="image/*" capture="environment">
   <img id="preview" class="preview">
-  <label>② タグ写真（試作版では保存用）</label><input id="tagPhoto" type="file" accept="image/*" capture="environment">
+  <label>② タグ写真（任意・AI解析にも使用）</label><input id="tagPhoto" type="file" accept="image/*" capture="environment">
+  <button id="analyzeBtn" class="light" style="width:100%;margin-bottom:10px" onclick="analyzeWithAI()">✨ AIで写真を解析</button>
+  <div id="aiStatus" class="notice" style="margin:-2px 0 10px"></div>
   <label>ブランド</label><input id="brand" placeholder="例：AZUL / NIKE / URBAN RESEARCH">
   <div class="row"><div><label>カテゴリ</label><select id="category"><option>Tシャツ</option><option>シャツ</option><option>アウター</option><option>パンツ</option><option>スカート</option><option>靴</option><option>バッグ</option><option>その他</option></select></div><div><label>色</label><input id="color" placeholder="L/GRY"></div></div>
   <div class="row"><div><label>サイズ</label><input id="size" placeholder="M"></div><div><label>価格（税込）</label><input id="price" inputmode="numeric" placeholder="3990"></div></div>
   <label>品番 / JAN / バーコード</label><input id="code" placeholder="251JAB80-2281 / 609000026524">
   <label>メモ</label><textarea id="memo" rows="2" placeholder="20%OFF、オーバーサイズなど"></textarea>
   <button class="dark" style="width:100%" onclick="saveItem()">この服を登録する</button>
-  <p class="notice">V1はGitHub Pagesだけで動くため、画像解析・JAN検索はまだ端末内で自動実行しません。次段階でAI/APIを接続できます。</p>
+  <p class="notice">服の写真を選んで「AIで写真を解析」を押すと、ブランド・カテゴリ・色・サイズ・価格・品番/JANなど、画像から確認できた項目を自動入力します。確認できない項目は空欄のままです。</p>
  </div>
 </section>
 
@@ -76,6 +78,33 @@ function go(id){['home','add','closet'].forEach(x=>$(x).classList.toggle('hidden
 function setMode(m){mode=m;$('candBtn').className=m==='candidate'?'active':'light';$('ownBtn').className=m==='owned'?'active':'light'}
 $('photo').addEventListener('change',e=>{let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{$('preview').src=r.result;$('preview').style.display='block'};r.readAsDataURL(f)});
 function fileData(file){return new Promise(res=>{if(!file)return res('');let r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)})}
+const AI_API='https://closet-mix-api.kjkt100.workers.dev';
+function setIfPresent(id,value){if(value===undefined||value===null||value==='')return;$(id).value=String(value)}
+function normalizeCategory(value){
+ const v=String(value||'').trim(); if(!v)return '';
+ const opts=[...$('category').options].map(o=>o.value); if(opts.includes(v))return v;
+ const m=[['Tシャツ',['tシャツ','tee','t-shirt','tshirt']],['シャツ',['シャツ','shirt']],['アウター',['アウター','ジャケット','コート','ブルゾン','outer','jacket','coat']],['パンツ',['パンツ','ズボン','デニム','ジーンズ','pants','trousers','jeans']],['スカート',['スカート','skirt']],['靴',['靴','シューズ','スニーカー','shoe','sneaker']],['バッグ',['バッグ','bag']]];
+ const low=v.toLowerCase(); for(const [cat,keys] of m){if(keys.some(k=>low.includes(k.toLowerCase())))return cat} return 'その他';
+}
+async function analyzeWithAI(){
+ const clothes=await fileData($('photo').files[0]);
+ if(!clothes){alert('先に服の写真を選んでください 📸');return}
+ const tag=await fileData($('tagPhoto').files[0]);
+ const btn=$('analyzeBtn'); btn.disabled=true; btn.textContent='AI解析中…'; $('aiStatus').textContent='写真を解析しています。少し待ってください。';
+ try{
+  const r=await fetch(AI_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clothesImage:clothes,tagImage:tag||''})});
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok||!data.ok)throw new Error(data.error||data.details||('HTTP '+r.status));
+  const a=data.analysis||{};
+  setIfPresent('brand',a.brand); if(a.category)$('category').value=normalizeCategory(a.category); setIfPresent('color',a.color); setIfPresent('size',a.size);
+  if(a.price!==undefined&&a.price!==null&&a.price!==''){const n=String(a.price).replace(/[^0-9]/g,'');if(n)$('price').value=n}
+  setIfPresent('code',a.productCode||a.janCode);
+  const extra=[a.material&&`素材: ${a.material}`,a.pattern&&`柄: ${a.pattern}`,a.season&&`季節: ${a.season}`,a.features,a.description].filter(Boolean).join(' / ');
+  if(extra)$('memo').value=[$('memo').value,extra].filter(Boolean).join(' / ');
+  $('aiStatus').textContent='AI解析できました ✨ 内容を確認してから登録してください。';
+ }catch(e){console.error(e);$('aiStatus').textContent='AI解析に失敗しました: '+e.message;alert('AI解析に失敗しました。\n'+e.message)}
+ finally{btn.disabled=false;btn.textContent='✨ AIで写真を解析'}
+}
 async function saveItem(){
  let img=await fileData($('photo').files[0]);
  let tag=await fileData($('tagPhoto').files[0]);
