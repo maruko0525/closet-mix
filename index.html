@@ -31,6 +31,7 @@ label{font-size:12px;color:var(--muted);font-weight:700}.preview{width:100%;aspe
 .editing{background:#fff7df;border:1px solid #f0d58a;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:13px;font-weight:700}
 .tagPreview{width:100%;max-height:220px;object-fit:contain;border-radius:16px;background:#eee;display:none;margin-bottom:8px}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 </head>
 <body>
 <header><div class="brand">CLOSET MIX</div><div class="sub">ブランドを越えて、服をひとつのクローゼットへ。</div></header>
@@ -56,6 +57,8 @@ label{font-size:12px;color:var(--muted);font-weight:700}.preview{width:100%;aspe
   <label>② タグ写真（任意・撮影・アルバムから選択）</label><input id="tagPhoto" type="file" accept="image/*">
   <img id="tagPreview" class="tagPreview">
   <div class="photoActions"><button class="light" onclick="choosePhoto('tagPhoto')">🔄 タグを変更</button><button class="secondaryDanger" onclick="clearPhoto('tagPhoto')">🗑️ タグを外す</button></div>
+  <div id="qrStatus" class="notice" style="margin:0 0 8px"></div>
+  <label>商品ページURL（任意・QRが読めた場合は自動入力）</label><input id="sourceUrl" type="url" placeholder="https://...">
   <button id="analyzeBtn" class="light" style="width:100%;margin-bottom:10px" onclick="analyzeWithAI()">✨ AIで写真を解析 / 再解析</button>
   <div id="aiStatus" class="notice" style="margin:-2px 0 10px"></div>
   <label>ブランド</label><input id="brand" placeholder="例：AZUL / NIKE / URBAN RESEARCH">
@@ -108,14 +111,14 @@ function clearPhoto(id){
  else{existingTag='';$('tagPreview').removeAttribute('src');$('tagPreview').style.display='none'}
 }
 function currentImage(inputId,existing){return $(inputId).files[0]?fileData($(inputId).files[0]):Promise.resolve(existing||'')}
-function hasDraft(){return !!($('photo').files[0]||$('tagPhoto').files[0]||existingImg||existingTag||['brand','color','size','price','code','memo'].some(x=>$(x).value.trim()))}
+function hasDraft(){return !!($('photo').files[0]||$('tagPhoto').files[0]||existingImg||existingTag||['brand','color','size','price','code','memo','sourceUrl'].some(x=>$(x).value.trim()))}
 function resetForm(resetMode=true){
  editingId=null;existingImg='';existingTag='';
- ['brand','color','size','price','code','memo'].forEach(x=>$(x).value='');
+ ['brand','color','size','price','code','memo','sourceUrl'].forEach(x=>$(x).value='');
  $('photo').value='';$('tagPhoto').value='';
  $('preview').removeAttribute('src');$('preview').style.display='none';
  $('tagPreview').removeAttribute('src');$('tagPreview').style.display='none';
- $('aiStatus').textContent='';$('editingNotice').classList.add('hidden');
+ $('aiStatus').textContent='';$('qrStatus').textContent='';$('editingNotice').classList.add('hidden');
  $('saveBtn').textContent='この服を登録する';
  if(resetMode)setMode('candidate');
 }
@@ -126,6 +129,30 @@ function cancelRegistration(){
 function fileData(file){return new Promise(res=>{if(!file)return res('');let r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)})}
 const AI_API='https://closet-mix-api.kjkt100.workers.dev';
 function setIfPresent(id,value){if(value===undefined||value===null||value==='')return;$(id).value=String(value)}
+async function detectQrFromDataUrl(dataUrl){
+ if(!dataUrl)return '';
+ try{
+  const img=new Image();
+  await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=dataUrl});
+  const max=1400,scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+  const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*scale));c.height=Math.max(1,Math.round(img.naturalHeight*scale));
+  const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(img,0,0,c.width,c.height);
+  const d=x.getImageData(0,0,c.width,c.height);
+  if(typeof jsQR!=='function')return '';
+  const q=jsQR(d.data,d.width,d.height,{inversionAttempts:'attemptBoth'});
+  const v=(q&&q.data||'').trim();return /^https?:\/\//i.test(v)?v:'';
+ }catch(e){console.warn('QR skipped',e);return ''}
+}
+async function resolveSourceUrl(tag){
+ let url=$('sourceUrl').value.trim();
+ if(url)return url;
+ if(!tag){$('qrStatus').textContent='QR：タグ写真なし（スキップ）';return ''}
+ $('qrStatus').textContent='QRを確認中…';
+ url=await detectQrFromDataUrl(tag);
+ if(url){$('sourceUrl').value=url;$('qrStatus').textContent='QRを検出しました ✓ 商品ページも補助情報として利用します。'}
+ else $('qrStatus').textContent='QRは検出できませんでした。写真だけで解析します。';
+ return url;
+}
 function normalizeCategory(value){
  const v=String(value||'').trim();if(!v)return '';
  const opts=[...$('category').options].map(o=>o.value);if(opts.includes(v))return v;
@@ -136,9 +163,10 @@ async function analyzeWithAI(){
  const clothes=await currentImage('photo',existingImg);
  if(!clothes){alert('先に服の写真を選んでください 📸');return}
  const tag=await currentImage('tagPhoto',existingTag);
+ const sourceUrl=await resolveSourceUrl(tag);
  const btn=$('analyzeBtn');btn.disabled=true;btn.textContent='AI解析中…';$('aiStatus').textContent='写真を解析しています。少し待ってください。';
  try{
-  const r=await fetch(AI_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clothesImage:clothes,tagImage:tag||''})});
+  const r=await fetch(AI_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clothesImage:clothes,tagImage:tag||'',sourceUrl})});
   const data=await r.json().catch(()=>({}));
   if(!r.ok||!data.ok)throw new Error(data.error||data.details||('HTTP '+r.status));
   const a=data.analysis||{};
@@ -162,7 +190,7 @@ async function saveItem(){
  let img=await currentImage('photo',existingImg);
  let tag=await currentImage('tagPhoto',existingTag);
  if(!img){alert('服の写真を選んでください 📸');return}
- const data={mode,img,tag,brand:$('brand').value||'ブランド未設定',category:$('category').value,color:$('color').value,size:$('size').value,price:Number(($('price').value||'0').replace(/,/g,'')),code:$('code').value,memo:$('memo').value};
+ const data={mode,img,tag,sourceUrl:$('sourceUrl').value.trim(),brand:$('brand').value||'ブランド未設定',category:$('category').value,color:$('color').value,size:$('size').value,price:Number(($('price').value||'0').replace(/,/g,'')),code:$('code').value,memo:$('memo').value};
  let backup=[...items];
  if(editingId!==null){
    const i=items.findIndex(x=>x.id===editingId);
@@ -182,7 +210,7 @@ function editItem(id){
  const x=items.find(v=>v.id===id);if(!x)return;
  editingId=id;existingImg=x.img||'';existingTag=x.tag||'';
  setMode(x.mode||'candidate');
- $('brand').value=x.brand||'';$('category').value=x.category||'その他';$('color').value=x.color||'';$('size').value=x.size||'';$('price').value=x.price||'';$('code').value=x.code||'';$('memo').value=x.memo||'';
+ $('brand').value=x.brand||'';$('category').value=x.category||'その他';$('color').value=x.color||'';$('size').value=x.size||'';$('price').value=x.price||'';$('code').value=x.code||'';$('memo').value=x.memo||'';$('sourceUrl').value=x.sourceUrl||'';
  $('photo').value='';$('tagPhoto').value='';
  if(existingImg){$('preview').src=existingImg;$('preview').style.display='block'}else{$('preview').style.display='none'}
  if(existingTag){$('tagPreview').src=existingTag;$('tagPreview').style.display='block'}else{$('tagPreview').style.display='none'}
