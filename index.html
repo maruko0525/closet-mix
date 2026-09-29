@@ -25,6 +25,11 @@ label{font-size:12px;color:var(--muted);font-weight:700}.preview{width:100%;aspe
 .tabs button{background:none;padding:8px 2px;font-size:12px}.tabs span{display:block;font-size:21px}.hidden{display:none!important}
 .empty{text-align:center;padding:24px;color:var(--muted)}.score{font-size:42px;font-weight:900}.row{display:flex;gap:8px}.row>*{flex:1}
 .notice{font-size:12px;color:var(--muted);line-height:1.45}.danger{color:#a11}.switch{display:flex;gap:7px;margin-bottom:10px}.switch button{flex:1;padding:10px}.active{background:#111827;color:white}
+.photoActions{display:flex;gap:8px;margin:-2px 0 12px}.photoActions button{flex:1;padding:10px;font-size:13px}
+.secondaryDanger{background:#fff;border:1px solid #f0caca;color:#a11}
+.formActions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:8px}
+.editing{background:#fff7df;border:1px solid #f0d58a;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:13px;font-weight:700}
+.tagPreview{width:100%;max-height:220px;object-fit:contain;border-radius:16px;background:#eee;display:none;margin-bottom:8px}
 </style>
 </head>
 <body>
@@ -44,18 +49,25 @@ label{font-size:12px;color:var(--muted);font-weight:700}.preview{width:100%;aspe
  <div class="card">
   <h2>📸 商品を登録</h2>
   <div class="switch"><button id="candBtn" class="active" onclick="setMode('candidate')">試着候補</button><button id="ownBtn" class="light" onclick="setMode('owned')">購入済み</button></div>
+  <div id="editingNotice" class="editing hidden">✏️ 登録済みの服を編集中です</div>
   <label>① 服の写真（撮影・アルバムから選択）</label><input id="photo" type="file" accept="image/*">
   <img id="preview" class="preview">
+  <div class="photoActions"><button class="light" onclick="choosePhoto('photo')">🔄 写真を変更</button><button class="secondaryDanger" onclick="clearPhoto('photo')">🗑️ 写真を外す</button></div>
   <label>② タグ写真（任意・撮影・アルバムから選択）</label><input id="tagPhoto" type="file" accept="image/*">
-  <button id="analyzeBtn" class="light" style="width:100%;margin-bottom:10px" onclick="analyzeWithAI()">✨ AIで写真を解析</button>
+  <img id="tagPreview" class="tagPreview">
+  <div class="photoActions"><button class="light" onclick="choosePhoto('tagPhoto')">🔄 タグを変更</button><button class="secondaryDanger" onclick="clearPhoto('tagPhoto')">🗑️ タグを外す</button></div>
+  <button id="analyzeBtn" class="light" style="width:100%;margin-bottom:10px" onclick="analyzeWithAI()">✨ AIで写真を解析 / 再解析</button>
   <div id="aiStatus" class="notice" style="margin:-2px 0 10px"></div>
   <label>ブランド</label><input id="brand" placeholder="例：AZUL / NIKE / URBAN RESEARCH">
   <div class="row"><div><label>カテゴリ</label><select id="category"><option>Tシャツ</option><option>シャツ</option><option>アウター</option><option>パンツ</option><option>スカート</option><option>靴</option><option>バッグ</option><option>その他</option></select></div><div><label>色</label><input id="color" placeholder="L/GRY"></div></div>
   <div class="row"><div><label>サイズ</label><input id="size" placeholder="M"></div><div><label>価格（税込）</label><input id="price" inputmode="numeric" placeholder="3990"></div></div>
   <label>品番 / JAN / バーコード</label><input id="code" placeholder="251JAB80-2281 / 609000026524">
   <label>メモ</label><textarea id="memo" rows="2" placeholder="20%OFF、オーバーサイズなど"></textarea>
-  <button class="dark" style="width:100%" onclick="saveItem()">この服を登録する</button>
-  <p class="notice">服の写真を選んで「AIで写真を解析」を押すと、画像から確認できた項目を自動入力します。</p>
+  <div class="formActions">
+   <button id="saveBtn" class="dark" onclick="saveItem()">この服を登録する</button>
+   <button class="secondaryDanger" onclick="cancelRegistration()">✕ 作業を取りやめる</button>
+  </div>
+  <p class="notice">写真は後から変更・削除できます。AI解析後でも登録を取りやめられます。</p>
  </div>
 </section>
 
@@ -73,10 +85,44 @@ label{font-size:12px;color:var(--muted);font-weight:700}.preview{width:100%;aspe
 <script>
 let mode='candidate';
 let items=JSON.parse(localStorage.getItem('closetMixItems')||'[]');
+let editingId=null;
+let existingImg='';
+let existingTag='';
 const $=id=>document.getElementById(id);
-function go(id){['home','add','closet'].forEach(x=>$(x).classList.toggle('hidden',x!==id));if(id==='home')renderSummary();if(id==='closet')renderItems();scrollTo(0,0)}
+function go(id){
+ if(id==='add' && editingId===null && !hasDraft()) resetForm(false);
+ ['home','add','closet'].forEach(x=>$(x).classList.toggle('hidden',x!==id));
+ if(id==='home')renderSummary();if(id==='closet')renderItems();scrollTo(0,0)
+}
 function setMode(m){mode=m;$('candBtn').className=m==='candidate'?'active':'light';$('ownBtn').className=m==='owned'?'active':'light'}
-$('photo').addEventListener('change',e=>{let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{$('preview').src=r.result;$('preview').style.display='block'};r.readAsDataURL(f)});
+function previewFile(inputId,previewId){
+ const f=$(inputId).files[0];if(!f)return;
+ const r=new FileReader();r.onload=()=>{$(previewId).src=r.result;$(previewId).style.display='block'};r.readAsDataURL(f)
+}
+$('photo').addEventListener('change',()=>{existingImg='';previewFile('photo','preview')});
+$('tagPhoto').addEventListener('change',()=>{existingTag='';previewFile('tagPhoto','tagPreview')});
+function choosePhoto(id){$(id).click()}
+function clearPhoto(id){
+ $(id).value='';
+ if(id==='photo'){existingImg='';$('preview').removeAttribute('src');$('preview').style.display='none'}
+ else{existingTag='';$('tagPreview').removeAttribute('src');$('tagPreview').style.display='none'}
+}
+function currentImage(inputId,existing){return $(inputId).files[0]?fileData($(inputId).files[0]):Promise.resolve(existing||'')}
+function hasDraft(){return !!($('photo').files[0]||$('tagPhoto').files[0]||existingImg||existingTag||['brand','color','size','price','code','memo'].some(x=>$(x).value.trim()))}
+function resetForm(resetMode=true){
+ editingId=null;existingImg='';existingTag='';
+ ['brand','color','size','price','code','memo'].forEach(x=>$(x).value='');
+ $('photo').value='';$('tagPhoto').value='';
+ $('preview').removeAttribute('src');$('preview').style.display='none';
+ $('tagPreview').removeAttribute('src');$('tagPreview').style.display='none';
+ $('aiStatus').textContent='';$('editingNotice').classList.add('hidden');
+ $('saveBtn').textContent='この服を登録する';
+ if(resetMode)setMode('candidate');
+}
+function cancelRegistration(){
+ if(hasDraft()&&!confirm('入力中の内容を破棄して登録を取りやめますか？'))return;
+ resetForm();go('closet');
+}
 function fileData(file){return new Promise(res=>{if(!file)return res('');let r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)})}
 const AI_API='https://closet-mix-api.kjkt100.workers.dev';
 function setIfPresent(id,value){if(value===undefined||value===null||value==='')return;$(id).value=String(value)}
@@ -87,9 +133,9 @@ function normalizeCategory(value){
  const low=v.toLowerCase();for(const [cat,keys] of m){if(keys.some(k=>low.includes(k.toLowerCase())))return cat}return 'その他';
 }
 async function analyzeWithAI(){
- const clothes=await fileData($('photo').files[0]);
+ const clothes=await currentImage('photo',existingImg);
  if(!clothes){alert('先に服の写真を選んでください 📸');return}
- const tag=await fileData($('tagPhoto').files[0]);
+ const tag=await currentImage('tagPhoto',existingTag);
  const btn=$('analyzeBtn');btn.disabled=true;btn.textContent='AI解析中…';$('aiStatus').textContent='写真を解析しています。少し待ってください。';
  try{
   const r=await fetch(AI_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clothesImage:clothes,tagImage:tag||''})});
@@ -113,18 +159,40 @@ async function analyzeWithAI(){
  }
 }
 async function saveItem(){
- let img=await fileData($('photo').files[0]);
- let tag=await fileData($('tagPhoto').files[0]);
- let it={id:Date.now(),mode,img,tag,brand:$('brand').value||'ブランド未設定',category:$('category').value,color:$('color').value,size:$('size').value,price:Number(($('price').value||'0').replace(/,/g,'')),code:$('code').value,memo:$('memo').value,created:new Date().toISOString()};
- items.unshift(it);
- try{localStorage.setItem('closetMixItems',JSON.stringify(items))}catch(e){alert('画像が大きく保存容量を超えました。写真を減らして試してください。');items.shift();return}
- ['brand','color','size','price','code','memo'].forEach(x=>$(x).value='');$('photo').value='';$('tagPhoto').value='';$('preview').style.display='none';
- alert('登録しました 👕');go('closet')
+ let img=await currentImage('photo',existingImg);
+ let tag=await currentImage('tagPhoto',existingTag);
+ if(!img){alert('服の写真を選んでください 📸');return}
+ const data={mode,img,tag,brand:$('brand').value||'ブランド未設定',category:$('category').value,color:$('color').value,size:$('size').value,price:Number(($('price').value||'0').replace(/,/g,'')),code:$('code').value,memo:$('memo').value};
+ let backup=[...items];
+ if(editingId!==null){
+   const i=items.findIndex(x=>x.id===editingId);
+   if(i<0){alert('編集対象が見つかりません。');return}
+   items[i]={...items[i],...data,updated:new Date().toISOString()};
+ }else{
+   items.unshift({id:Date.now(),...data,created:new Date().toISOString()});
+ }
+ try{localStorage.setItem('closetMixItems',JSON.stringify(items))}
+ catch(e){items=backup;alert('画像が大きく保存容量を超えました。写真を減らして試してください。');return}
+ const wasEdit=editingId!==null;
+ resetForm();
+ alert(wasEdit?'変更を保存しました ✨':'登録しました 👕');
+ go('closet')
+}
+function editItem(id){
+ const x=items.find(v=>v.id===id);if(!x)return;
+ editingId=id;existingImg=x.img||'';existingTag=x.tag||'';
+ setMode(x.mode||'candidate');
+ $('brand').value=x.brand||'';$('category').value=x.category||'その他';$('color').value=x.color||'';$('size').value=x.size||'';$('price').value=x.price||'';$('code').value=x.code||'';$('memo').value=x.memo||'';
+ $('photo').value='';$('tagPhoto').value='';
+ if(existingImg){$('preview').src=existingImg;$('preview').style.display='block'}else{$('preview').style.display='none'}
+ if(existingTag){$('tagPreview').src=existingTag;$('tagPreview').style.display='block'}else{$('tagPreview').style.display='none'}
+ $('editingNotice').classList.remove('hidden');$('saveBtn').textContent='変更を保存する';$('aiStatus').textContent='';
+ ['home','add','closet'].forEach(v=>$(v).classList.toggle('hidden',v!=='add'));scrollTo(0,0)
 }
 function yen(n){return n?new Intl.NumberFormat('ja-JP',{style:'currency',currency:'JPY',maximumFractionDigits:0}).format(n):'価格未登録'}
 function renderItems(){
  if(!items.length){$('items').innerHTML='<div class="empty" style="grid-column:1/-1">まだ服がありません</div>';return}
- $('items').innerHTML=items.map(x=>`<div class="item">${x.img?`<img src="${x.img}">`:`<div style="aspect-ratio:1;background:#eee;display:grid;place-items:center;font-size:40px">👕</div>`}<div class="pad"><b>${esc(x.brand)}</b><div class="tiny">${esc(x.category)} ${esc(x.color||'')}</div><span class="badge">${x.mode==='candidate'?'試着候補':'購入済み'}</span>${x.size?`<span class="badge">${esc(x.size)}</span>`:''}<div class="price">${yen(x.price)}</div><button class="light" style="width:100%;margin-top:8px;padding:8px" onclick="del(${x.id})">削除</button></div></div>`).join('')
+ $('items').innerHTML=items.map(x=>`<div class="item">${x.img?`<img src="${x.img}">`:`<div style="aspect-ratio:1;background:#eee;display:grid;place-items:center;font-size:40px">👕</div>`}<div class="pad"><b>${esc(x.brand)}</b><div class="tiny">${esc(x.category)} ${esc(x.color||'')}</div><span class="badge">${x.mode==='candidate'?'試着候補':'購入済み'}</span>${x.size?`<span class="badge">${esc(x.size)}</span>`:''}<div class="price">${yen(x.price)}</div><div class="row" style="margin-top:8px"><button class="light" style="padding:8px" onclick="editItem(${x.id})">✏️ 編集</button><button class="secondaryDanger" style="padding:8px" onclick="del(${x.id})">削除</button></div></div></div>`).join('')
 }
 function del(id){if(confirm('この服を削除しますか？')){items=items.filter(x=>x.id!==id);localStorage.setItem('closetMixItems',JSON.stringify(items));renderItems();renderSummary()}}
 function renderSummary(){
