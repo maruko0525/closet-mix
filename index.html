@@ -58,7 +58,8 @@ label{font-size:12px;color:var(--muted);font-weight:700}.preview{width:100%;aspe
   <img id="tagPreview" class="tagPreview">
   <div class="photoActions"><button class="light" onclick="choosePhoto('tagPhoto')">🔄 タグを変更</button><button class="secondaryDanger" onclick="clearPhoto('tagPhoto')">🗑️ タグを外す</button></div>
   <div id="qrStatus" class="notice" style="margin:0 0 8px"></div>
-  <label>商品ページURL（任意・QRが読めた場合は自動入力）</label><input id="sourceUrl" type="url" placeholder="https://...">
+  <label>商品ページURL（任意・QRが読めた場合は自動入力）</label><input id="sourceUrl" type="url" placeholder="https://..." oninput="updateProductLink()">
+  <button id="productLinkBtn" class="light hidden" style="width:100%;margin:-1px 0 10px" onclick="openProductPage()">🌐 Safariで商品ページを見る</button>
   <button id="analyzeBtn" class="light" style="width:100%;margin-bottom:10px" onclick="analyzeWithAI()">✨ AIで写真を解析 / 再解析</button>
   <div id="aiStatus" class="notice" style="margin:-2px 0 10px"></div>
   <label>ブランド</label><input id="brand" placeholder="例：AZUL / NIKE / URBAN RESEARCH">
@@ -91,6 +92,8 @@ let items=JSON.parse(localStorage.getItem('closetMixItems')||'[]');
 let editingId=null;
 let existingImg='';
 let existingTag='';
+let compressedPhoto='';
+let compressedTag='';
 const $=id=>document.getElementById(id);
 function go(id){
  if(id==='add' && editingId===null && !hasDraft()) resetForm(false);
@@ -98,27 +101,73 @@ function go(id){
  if(id==='home')renderSummary();if(id==='closet')renderItems();scrollTo(0,0)
 }
 function setMode(m){mode=m;$('candBtn').className=m==='candidate'?'active':'light';$('ownBtn').className=m==='owned'?'active':'light'}
-function previewFile(inputId,previewId){
- const f=$(inputId).files[0];if(!f)return;
- const r=new FileReader();r.onload=()=>{$(previewId).src=r.result;$(previewId).style.display='block'};r.readAsDataURL(f)
+async function compressImageFile(file,kind='clothes'){
+ if(!file)return '';
+ const src=await fileData(file);
+ const img=new Image();
+ await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=src});
+ // タグは文字を読むため少し高解像度、服写真は保存容量優先。
+ const cfg=kind==='tag'
+  ? {max:1500,target:260*1024,startQ:.72,minQ:.42}
+  : {max:1100,target:170*1024,startQ:.68,minQ:.38};
+ let scale=Math.min(1,cfg.max/Math.max(img.naturalWidth,img.naturalHeight));
+ let w=Math.max(1,Math.round(img.naturalWidth*scale));
+ let h=Math.max(1,Math.round(img.naturalHeight*scale));
+ let quality=cfg.startQ;
+ let out='';
+ for(let pass=0;pass<8;pass++){
+  const c=document.createElement('canvas');c.width=w;c.height=h;
+  const x=c.getContext('2d');x.drawImage(img,0,0,w,h);
+  out=c.toDataURL('image/jpeg',quality);
+  const bytes=Math.round((out.length-out.indexOf(',')-1)*.75);
+  if(bytes<=cfg.target||quality<=cfg.minQ){
+   if(bytes<=cfg.target||pass>=7)return out;
+  }
+  if(quality>cfg.minQ+.05)quality=Math.max(cfg.minQ,quality-.09);
+  else {w=Math.max(480,Math.round(w*.84));h=Math.max(480,Math.round(h*.84));}
+ }
+ return out;
 }
-$('photo').addEventListener('change',()=>{existingImg='';previewFile('photo','preview')});
-$('tagPhoto').addEventListener('change',()=>{existingTag='';previewFile('tagPhoto','tagPreview')});
+async function handlePhotoChange(inputId,previewId,kind){
+ const f=$(inputId).files[0];if(!f)return;
+ try{
+  if(kind==='tag'){
+   existingTag='';compressedTag='';
+   clearAnalysisForNewTag();
+   $('qrStatus').textContent='タグ写真を軽量化しています…';
+   compressedTag=await compressImageFile(f,'tag');
+   $(previewId).src=compressedTag;$(previewId).style.display='block';
+   $('qrStatus').textContent='タグ写真を軽量化しました ✓ AI解析するとQRも確認します。';
+  }else{
+   existingImg='';compressedPhoto='';
+   compressedPhoto=await compressImageFile(f,'clothes');
+   $(previewId).src=compressedPhoto;$(previewId).style.display='block';
+  }
+ }catch(e){console.error(e);alert('写真の軽量化に失敗しました。別の写真で試してください。')}
+}
+$('photo').addEventListener('change',()=>handlePhotoChange('photo','preview','clothes'));
+$('tagPhoto').addEventListener('change',()=>handlePhotoChange('tagPhoto','tagPreview','tag'));
+function clearAnalysisForNewTag(){
+ ['brand','color','size','price','code','memo','sourceUrl'].forEach(x=>$(x).value='');
+ $('category').value='その他';
+ $('aiStatus').textContent='新しいタグに変更しました。前の解析結果をクリアしました。';
+ updateProductLink();
+}
 function choosePhoto(id){$(id).click()}
 function clearPhoto(id){
  $(id).value='';
- if(id==='photo'){existingImg='';$('preview').removeAttribute('src');$('preview').style.display='none'}
- else{existingTag='';$('tagPreview').removeAttribute('src');$('tagPreview').style.display='none'}
+ if(id==='photo'){existingImg='';compressedPhoto='';$('preview').removeAttribute('src');$('preview').style.display='none'}
+ else{existingTag='';compressedTag='';$('tagPreview').removeAttribute('src');$('tagPreview').style.display='none';clearAnalysisForNewTag();$('qrStatus').textContent=''}
 }
-function currentImage(inputId,existing){return $(inputId).files[0]?fileData($(inputId).files[0]):Promise.resolve(existing||'')}
+function currentImage(inputId,existing){if(inputId==='photo'&&compressedPhoto)return Promise.resolve(compressedPhoto);if(inputId==='tagPhoto'&&compressedTag)return Promise.resolve(compressedTag);return $(inputId).files[0]?compressImageFile($(inputId).files[0],inputId==='tagPhoto'?'tag':'clothes'):Promise.resolve(existing||'')}
 function hasDraft(){return !!($('photo').files[0]||$('tagPhoto').files[0]||existingImg||existingTag||['brand','color','size','price','code','memo','sourceUrl'].some(x=>$(x).value.trim()))}
 function resetForm(resetMode=true){
- editingId=null;existingImg='';existingTag='';
+ editingId=null;existingImg='';existingTag='';compressedPhoto='';compressedTag='';
  ['brand','color','size','price','code','memo','sourceUrl'].forEach(x=>$(x).value='');
  $('photo').value='';$('tagPhoto').value='';
  $('preview').removeAttribute('src');$('preview').style.display='none';
  $('tagPreview').removeAttribute('src');$('tagPreview').style.display='none';
- $('aiStatus').textContent='';$('qrStatus').textContent='';$('editingNotice').classList.add('hidden');
+ $('aiStatus').textContent='';$('qrStatus').textContent='';updateProductLink();$('editingNotice').classList.add('hidden');
  $('saveBtn').textContent='この服を登録する';
  if(resetMode)setMode('candidate');
 }
@@ -149,9 +198,19 @@ async function resolveSourceUrl(tag){
  if(!tag){$('qrStatus').textContent='QR：タグ写真なし（スキップ）';return ''}
  $('qrStatus').textContent='QRを確認中…';
  url=await detectQrFromDataUrl(tag);
- if(url){$('sourceUrl').value=url;$('qrStatus').textContent='QRを検出しました ✓ 商品ページも補助情報として利用します。'}
+ if(url){$('sourceUrl').value=url;updateProductLink();$('qrStatus').textContent='QRを検出しました ✓ 商品ページも補助情報として利用します。'}
  else $('qrStatus').textContent='QRは検出できませんでした。写真だけで解析します。';
  return url;
+}
+function updateProductLink(){
+ const url=$('sourceUrl').value.trim();
+ const ok=/^https?:\/\//i.test(url);
+ $('productLinkBtn').classList.toggle('hidden',!ok);
+}
+function openProductPage(){
+ const url=$('sourceUrl').value.trim();
+ if(!/^https?:\/\//i.test(url)){alert('商品ページURLがありません。');return}
+ window.open(url,'_blank','noopener,noreferrer');
 }
 function normalizeCategory(value){
  const v=String(value||'').trim();if(!v)return '';
@@ -210,7 +269,7 @@ function editItem(id){
  const x=items.find(v=>v.id===id);if(!x)return;
  editingId=id;existingImg=x.img||'';existingTag=x.tag||'';
  setMode(x.mode||'candidate');
- $('brand').value=x.brand||'';$('category').value=x.category||'その他';$('color').value=x.color||'';$('size').value=x.size||'';$('price').value=x.price||'';$('code').value=x.code||'';$('memo').value=x.memo||'';$('sourceUrl').value=x.sourceUrl||'';
+ $('brand').value=x.brand||'';$('category').value=x.category||'その他';$('color').value=x.color||'';$('size').value=x.size||'';$('price').value=x.price||'';$('code').value=x.code||'';$('memo').value=x.memo||'';$('sourceUrl').value=x.sourceUrl||'';updateProductLink();
  $('photo').value='';$('tagPhoto').value='';
  if(existingImg){$('preview').src=existingImg;$('preview').style.display='block'}else{$('preview').style.display='none'}
  if(existingTag){$('tagPreview').src=existingTag;$('tagPreview').style.display='block'}else{$('tagPreview').style.display='none'}
@@ -220,7 +279,7 @@ function editItem(id){
 function yen(n){return n?new Intl.NumberFormat('ja-JP',{style:'currency',currency:'JPY',maximumFractionDigits:0}).format(n):'価格未登録'}
 function renderItems(){
  if(!items.length){$('items').innerHTML='<div class="empty" style="grid-column:1/-1">まだ服がありません</div>';return}
- $('items').innerHTML=items.map(x=>`<div class="item">${x.img?`<img src="${x.img}">`:`<div style="aspect-ratio:1;background:#eee;display:grid;place-items:center;font-size:40px">👕</div>`}<div class="pad"><b>${esc(x.brand)}</b><div class="tiny">${esc(x.category)} ${esc(x.color||'')}</div><span class="badge">${x.mode==='candidate'?'試着候補':'購入済み'}</span>${x.size?`<span class="badge">${esc(x.size)}</span>`:''}<div class="price">${yen(x.price)}</div><div class="row" style="margin-top:8px"><button class="light" style="padding:8px" onclick="editItem(${x.id})">✏️ 編集</button><button class="secondaryDanger" style="padding:8px" onclick="del(${x.id})">削除</button></div></div></div>`).join('')
+ $('items').innerHTML=items.map(x=>`<div class="item">${x.img?`<img src="${x.img}">`:`<div style="aspect-ratio:1;background:#eee;display:grid;place-items:center;font-size:40px">👕</div>`}<div class="pad"><b>${esc(x.brand)}</b><div class="tiny">${esc(x.category)} ${esc(x.color||'')}</div><span class="badge">${x.mode==='candidate'?'試着候補':'購入済み'}</span>${x.size?`<span class="badge">${esc(x.size)}</span>`:''}<div class="price">${yen(x.price)}</div>${x.sourceUrl?`<button class="light" style="width:100%;padding:8px;margin-top:8px" onclick="window.open(\'${escJs(x.sourceUrl)}\',\'_blank\',\'noopener,noreferrer\')">🌐 商品ページ</button>`:''}<div class="row" style="margin-top:8px"><button class="light" style="padding:8px" onclick="editItem(${x.id})">✏️ 編集</button><button class="secondaryDanger" style="padding:8px" onclick="del(${x.id})">削除</button></div></div></div>`).join('')
 }
 function del(id){if(confirm('この服を削除しますか？')){items=items.filter(x=>x.id!==id);localStorage.setItem('closetMixItems',JSON.stringify(items));renderItems();renderSummary()}}
 function renderSummary(){
@@ -236,6 +295,7 @@ function makeCoordinate(){
  let score=Math.min(96,72+chosen.length*6);
  $('coordinate').innerHTML=`<div class="card"><div class="score">${score}<small style="font-size:16px"> / 100</small></div><b>ブランド横断コーデ</b><p>${chosen.map(x=>esc(x.brand)+' '+esc(x.category)).join(' ＋ ')}</p><p class="notice">V1のスコアはカテゴリ構成によるデモ評価です。</p></div>`
 }
+function escJs(s=''){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
 function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 renderSummary();
 
