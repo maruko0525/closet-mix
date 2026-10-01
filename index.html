@@ -94,7 +94,34 @@ let existingImg='';
 let existingTag='';
 let compressedPhoto='';
 let compressedTag='';
+// 各入力欄の由来を内部だけで管理: ai / user / qr / empty
+let fieldSource={brand:'empty',category:'empty',color:'empty',size:'empty',price:'empty',code:'empty',memo:'empty',sourceUrl:'empty'};
 const $=id=>document.getElementById(id);
+const trackedFields=['brand','category','color','size','price','code','memo','sourceUrl'];
+function resetFieldSources(){trackedFields.forEach(id=>fieldSource[id]='empty')}
+function markUserField(id){fieldSource[id]='user'}
+function bindFieldSourceTracking(){
+ trackedFields.forEach(id=>{
+  const el=$(id);if(!el)return;
+  const ev=(el.tagName==='SELECT')?'change':'input';
+  el.addEventListener(ev,()=>markUserField(id));
+ });
+}
+function setSourcedValue(id,value,source='ai'){
+ if(fieldSource[id]==='user')return;
+ const el=$(id);if(!el)return;
+ let v=(value===undefined||value===null)?'':String(value);
+ if(id==='category')v=v?normalizeCategory(v):'その他';
+ if(id==='price'&&v)v=v.replace(/[^0-9]/g,'');
+ el.value=v;fieldSource[id]=v?source:'empty';
+}
+function clearNonUserAnalysis(){
+ ['brand','category','color','size','price','code','memo'].forEach(id=>{
+  if(fieldSource[id]!=='user'){ $(id).value=id==='category'?'その他':''; fieldSource[id]='empty'; }
+ });
+ if(fieldSource.sourceUrl!=='user'){ $('sourceUrl').value='';fieldSource.sourceUrl='empty';updateProductLink(); }
+}
+document.addEventListener('DOMContentLoaded',bindFieldSourceTracking);
 function go(id){
  if(id==='add' && editingId===null && !hasDraft()) resetForm(false);
  ['home','add','closet'].forEach(x=>$(x).classList.toggle('hidden',x!==id));
@@ -148,10 +175,8 @@ async function handlePhotoChange(inputId,previewId,kind){
 $('photo').addEventListener('change',()=>handlePhotoChange('photo','preview','clothes'));
 $('tagPhoto').addEventListener('change',()=>handlePhotoChange('tagPhoto','tagPreview','tag'));
 function clearAnalysisForNewTag(){
- ['brand','color','size','price','code','memo','sourceUrl'].forEach(x=>$(x).value='');
- $('category').value='その他';
- $('aiStatus').textContent='新しいタグに変更しました。前の解析結果をクリアしました。';
- updateProductLink();
+ clearNonUserAnalysis();
+ $('aiStatus').textContent='新しいタグに変更しました。AIが入れた前回情報だけをクリアしました。';
 }
 function choosePhoto(id){$(id).click()}
 function clearPhoto(id){
@@ -163,7 +188,9 @@ function currentImage(inputId,existing){if(inputId==='photo'&&compressedPhoto)re
 function hasDraft(){return !!($('photo').files[0]||$('tagPhoto').files[0]||existingImg||existingTag||['brand','color','size','price','code','memo','sourceUrl'].some(x=>$(x).value.trim()))}
 function resetForm(resetMode=true){
  editingId=null;existingImg='';existingTag='';compressedPhoto='';compressedTag='';
+ resetFieldSources();
  ['brand','color','size','price','code','memo','sourceUrl'].forEach(x=>$(x).value='');
+ $('category').value='その他';
  $('photo').value='';$('tagPhoto').value='';
  $('preview').removeAttribute('src');$('preview').style.display='none';
  $('tagPreview').removeAttribute('src');$('tagPreview').style.display='none';
@@ -198,7 +225,7 @@ async function resolveSourceUrl(tag){
  if(!tag){$('qrStatus').textContent='QR：タグ写真なし（スキップ）';return ''}
  $('qrStatus').textContent='QRを確認中…';
  url=await detectQrFromDataUrl(tag);
- if(url){$('sourceUrl').value=url;updateProductLink();$('qrStatus').textContent='QRを検出しました ✓ 商品ページも補助情報として利用します。'}
+ if(url){$('sourceUrl').value=url;fieldSource.sourceUrl='qr';updateProductLink();$('qrStatus').textContent='QRを検出しました ✓ 商品ページも補助情報として利用します。'}
  else $('qrStatus').textContent='QRは検出できませんでした。写真だけで解析します。';
  return url;
 }
@@ -229,13 +256,15 @@ async function analyzeWithAI(){
   const data=await r.json().catch(()=>({}));
   if(!r.ok||!data.ok)throw new Error(data.error||data.details||('HTTP '+r.status));
   const a=data.analysis||{};
-  setIfPresent('brand',a.brand);
-  if(a.category)$('category').value=normalizeCategory(a.category);
-  setIfPresent('color',a.color);setIfPresent('size',a.size);
-  if(a.price!==undefined&&a.price!==null&&a.price!==''){const n=String(a.price).replace(/[^0-9]/g,'');if(n)$('price').value=n}
-  setIfPresent('code',a.productCode||a.janCode);
+  // AI由来の値は毎回「今回の結果」に置換。ユーザーが触った欄だけ保護する。
+  setSourcedValue('brand',a.brand,'ai');
+  setSourcedValue('category',a.category,'ai');
+  setSourcedValue('color',a.color,'ai');
+  setSourcedValue('size',a.size,'ai');
+  setSourcedValue('price',a.price,'ai');
+  setSourcedValue('code',a.productCode||a.janCode,'ai');
   const extra=[a.material&&`素材: ${a.material}`,a.pattern&&`柄: ${a.pattern}`,a.season&&`季節: ${a.season}`,a.features,a.description].filter(Boolean).join(' / ');
-  if(extra)$('memo').value=[$('memo').value,extra].filter(Boolean).join(' / ');
+  setSourcedValue('memo',extra,'ai');
   $('aiStatus').textContent='AI解析できました ✨ 内容を確認してから登録してください。';
  }catch(e){
   console.error(e);
@@ -249,7 +278,7 @@ async function saveItem(){
  let img=await currentImage('photo',existingImg);
  let tag=await currentImage('tagPhoto',existingTag);
  if(!img){alert('服の写真を選んでください 📸');return}
- const data={mode,img,tag,sourceUrl:$('sourceUrl').value.trim(),brand:$('brand').value||'ブランド未設定',category:$('category').value,color:$('color').value,size:$('size').value,price:Number(($('price').value||'0').replace(/,/g,'')),code:$('code').value,memo:$('memo').value};
+ const data={mode,img,tag,sourceUrl:$('sourceUrl').value.trim(),brand:$('brand').value||'ブランド未設定',category:$('category').value,color:$('color').value,size:$('size').value,price:Number(($('price').value||'0').replace(/,/g,'')),code:$('code').value,memo:$('memo').value,_fieldSources:{...fieldSource}};
  let backup=[...items];
  if(editingId!==null){
    const i=items.findIndex(x=>x.id===editingId);
@@ -269,7 +298,7 @@ function editItem(id){
  const x=items.find(v=>v.id===id);if(!x)return;
  editingId=id;existingImg=x.img||'';existingTag=x.tag||'';
  setMode(x.mode||'candidate');
- $('brand').value=x.brand||'';$('category').value=x.category||'その他';$('color').value=x.color||'';$('size').value=x.size||'';$('price').value=x.price||'';$('code').value=x.code||'';$('memo').value=x.memo||'';$('sourceUrl').value=x.sourceUrl||'';updateProductLink();
+ $('brand').value=x.brand||'';$('category').value=x.category||'その他';$('color').value=x.color||'';$('size').value=x.size||'';$('price').value=x.price||'';$('code').value=x.code||'';$('memo').value=x.memo||'';$('sourceUrl').value=x.sourceUrl||'';fieldSource={...fieldSource,...(x._fieldSources||{})};updateProductLink();
  $('photo').value='';$('tagPhoto').value='';
  if(existingImg){$('preview').src=existingImg;$('preview').style.display='block'}else{$('preview').style.display='none'}
  if(existingTag){$('tagPreview').src=existingTag;$('tagPreview').style.display='block'}else{$('tagPreview').style.display='none'}
