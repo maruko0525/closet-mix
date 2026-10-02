@@ -255,7 +255,24 @@ async function analyzeWithAI(){
   const r=await fetch(AI_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clothesImage:clothes,tagImage:tag||'',sourceUrl})});
   const data=await r.json().catch(()=>({}));
   if(!r.ok||!data.ok)throw new Error(data.error||data.details||('HTTP '+r.status));
-  const a=data.analysis||{};
+  let a=data.analysis||{};
+
+  // タグがあるのに主要項目を取りこぼした場合だけ、タグを主画像としてもう一度読む。
+  // 1回目の結果を捨てず、2回目は「空欄だけ」を補完するので、読めていた値は壊さない。
+  const missingTagKeys=['brand','size','price','productCode','janCode','material'].filter(k=>!String(a[k]??'').trim());
+  if(tag && missingTagKeys.length>=2){
+   $('aiStatus').textContent='タグの細かい文字を再確認しています…';
+   try{
+    const rr=await fetch(AI_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clothesImage:tag,tagImage:tag,sourceUrl})});
+    const dd=await rr.json().catch(()=>({}));
+    if(rr.ok&&dd.ok&&dd.analysis){
+     const b=dd.analysis;
+     const keys=['brand','productName','category','color','colorCode','size','price','productCode','janCode','material','maker','countryOfOrigin','pattern','season','features','description'];
+     for(const k of keys){if(!String(a[k]??'').trim()&&String(b[k]??'').trim())a[k]=b[k]}
+    }
+   }catch(e){console.warn('tag detail retry skipped',e)}
+  }
+
   // AI由来の値は毎回「今回の結果」に置換。ユーザーが触った欄だけ保護する。
   setSourcedValue('brand',a.brand,'ai');
   setSourcedValue('category',a.category,'ai');
