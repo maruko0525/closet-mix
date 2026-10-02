@@ -224,7 +224,16 @@ async function resolveSourceUrl(tag){
  if(url)return url;
  if(!tag){$('qrStatus').textContent='QR：タグ写真なし（スキップ）';return ''}
  $('qrStatus').textContent='QRを確認中…';
- url=await detectQrFromDataUrl(tag);
+ // QRは圧縮後の画像だと細い模様が潰れることがある。
+ // 新しく選んだタグ写真がある場合は、AI送信用の圧縮画像ではなく原本を先にQR解析する。
+ let qrImage=tag;
+ const originalTagFile=$('tagPhoto').files && $('tagPhoto').files[0];
+ if(originalTagFile){
+  try{ qrImage=await fileData(originalTagFile); }catch(e){ console.warn('original tag QR fallback',e); }
+ }
+ url=await detectQrFromDataUrl(qrImage);
+ // 原本で読めなかった場合だけ圧縮版でも再試行する。
+ if(!url && qrImage!==tag) url=await detectQrFromDataUrl(tag);
  if(url){$('sourceUrl').value=url;fieldSource.sourceUrl='qr';updateProductLink();$('qrStatus').textContent='QRを検出しました ✓ 商品ページも補助情報として利用します。'}
  else $('qrStatus').textContent='QRは検出できませんでした。写真だけで解析します。';
  return url;
@@ -260,7 +269,7 @@ async function analyzeWithAI(){
   // タグがあるのに主要項目を取りこぼした場合だけ、タグを主画像としてもう一度読む。
   // 1回目の結果を捨てず、2回目は「空欄だけ」を補完するので、読めていた値は壊さない。
   const missingTagKeys=['brand','size','price','productCode','janCode','material'].filter(k=>!String(a[k]??'').trim());
-  if(tag && missingTagKeys.length>=2){
+  if(tag && (missingTagKeys.includes('brand') || missingTagKeys.length>=2)){
    $('aiStatus').textContent='タグの細かい文字を再確認しています…';
    try{
     const rr=await fetch(AI_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clothesImage:tag,tagImage:tag,sourceUrl})});
