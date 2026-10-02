@@ -21,7 +21,7 @@ label{font-size:12px;color:var(--muted);font-weight:700}.preview{width:100%;aspe
 .items{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.item{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:white}
 .item img{width:100%;aspect-ratio:1/1;object-fit:cover;background:#eee}.item .pad{padding:10px}.tiny{font-size:12px;color:var(--muted)}.price{font-weight:850;margin-top:5px}
 .badge{display:inline-block;padding:4px 8px;background:#f1f1f1;border-radius:99px;font-size:11px;margin:3px 3px 0 0}
-.tabs{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);display:grid;grid-template-columns:repeat(3,1fr);padding:8px 8px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);z-index:10}
+.tabs{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);display:grid;grid-template-columns:repeat(4,1fr);padding:8px 8px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);z-index:10}
 .tabs button{background:none;padding:8px 2px;font-size:12px}.tabs span{display:block;font-size:21px}.hidden{display:none!important}
 .empty{text-align:center;padding:24px;color:var(--muted)}.score{font-size:42px;font-weight:900}.row{display:flex;gap:8px}.row>*{flex:1}
 .notice{font-size:12px;color:var(--muted);line-height:1.45}.danger{color:#a11}.switch{display:flex;gap:7px;margin-bottom:10px}.switch button{flex:1;padding:10px}.active{background:#111827;color:white}
@@ -29,7 +29,7 @@ label{font-size:12px;color:var(--muted);font-weight:700}.preview{width:100%;aspe
 .secondaryDanger{background:#fff;border:1px solid #f0caca;color:#a11}
 .formActions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:8px}
 .editing{background:#fff7df;border:1px solid #f0d58a;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:13px;font-weight:700}
-.tagPreview{width:100%;max-height:220px;object-fit:contain;border-radius:16px;background:#eee;display:none;margin-bottom:8px}
+.tagPreview{width:100%;max-height:220px;object-fit:contain;border-radius:16px;background:#eee;display:none;margin-bottom:8px}.coordGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.pick{border:2px solid transparent}.pick.selected{border-color:#111827}.simStage{min-height:420px;background:linear-gradient(#eee9e1,#fafafa);border-radius:22px;padding:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}.simStage img{width:46%;max-height:155px;object-fit:contain;filter:drop-shadow(0 6px 10px #0002)}.dnaBar{height:10px;background:#eee;border-radius:99px;overflow:hidden;margin:5px 0 12px}.dnaBar i{display:block;height:100%;background:#111827;border-radius:99px}.dnaRow{display:flex;justify-content:space-between;gap:8px;font-weight:800}.searchRef{display:block;text-decoration:none;color:#111827;background:#fff;border:1px solid var(--line);padding:12px;border-radius:14px;margin-top:8px}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 </head>
@@ -78,12 +78,18 @@ label{font-size:12px;color:var(--muted);font-weight:700}.preview{width:100%;aspe
 <section id="closet" class="hidden">
  <div class="card"><h2>👕 MY CLOSET</h2><div id="items" class="items"></div></div>
 </section>
+<section id="coordinatePage" class="hidden">
+ <div class="card"><h2>🧥 コーデを作る</h2><p class="notice">登録した服をタップして組み合わせます。最大4点。</p><div id="coordItems" class="coordGrid"></div><button class="dark" style="width:100%;margin-top:12px" onclick="buildLook()">✨ このコーデを完成</button></div>
+ <div id="lookResult"></div>
+</section>
+
 </main>
 
 <nav class="tabs">
 <button onclick="go('home')"><span>🏠</span>ホーム</button>
 <button onclick="go('add')"><span>📷</span>登録</button>
 <button onclick="go('closet')"><span>👕</span>クローゼット</button>
+<button onclick="go('coordinatePage')"><span>🧬</span>コーデ</button>
 </nav>
 
 <script>
@@ -124,8 +130,8 @@ function clearNonUserAnalysis(){
 document.addEventListener('DOMContentLoaded',bindFieldSourceTracking);
 function go(id){
  if(id==='add' && editingId===null && !hasDraft()) resetForm(false);
- ['home','add','closet'].forEach(x=>$(x).classList.toggle('hidden',x!==id));
- if(id==='home')renderSummary();if(id==='closet')renderItems();scrollTo(0,0)
+ ['home','add','closet','coordinatePage'].forEach(x=>$(x).classList.toggle('hidden',x!==id));
+ if(id==='home')renderSummary();if(id==='closet')renderItems();if(id==='coordinatePage')renderCoordPicker();scrollTo(0,0)
 }
 function setMode(m){mode=m;$('candBtn').className=m==='candidate'?'active':'light';$('ownBtn').className=m==='owned'?'active':'light'}
 async function compressImageFile(file,kind='clothes'){
@@ -224,16 +230,7 @@ async function resolveSourceUrl(tag){
  if(url)return url;
  if(!tag){$('qrStatus').textContent='QR：タグ写真なし（スキップ）';return ''}
  $('qrStatus').textContent='QRを確認中…';
- // QRは圧縮後の画像だと細い模様が潰れることがある。
- // 新しく選んだタグ写真がある場合は、AI送信用の圧縮画像ではなく原本を先にQR解析する。
- let qrImage=tag;
- const originalTagFile=$('tagPhoto').files && $('tagPhoto').files[0];
- if(originalTagFile){
-  try{ qrImage=await fileData(originalTagFile); }catch(e){ console.warn('original tag QR fallback',e); }
- }
- url=await detectQrFromDataUrl(qrImage);
- // 原本で読めなかった場合だけ圧縮版でも再試行する。
- if(!url && qrImage!==tag) url=await detectQrFromDataUrl(tag);
+ url=await detectQrFromDataUrl(tag);
  if(url){$('sourceUrl').value=url;fieldSource.sourceUrl='qr';updateProductLink();$('qrStatus').textContent='QRを検出しました ✓ 商品ページも補助情報として利用します。'}
  else $('qrStatus').textContent='QRは検出できませんでした。写真だけで解析します。';
  return url;
@@ -269,7 +266,7 @@ async function analyzeWithAI(){
   // タグがあるのに主要項目を取りこぼした場合だけ、タグを主画像としてもう一度読む。
   // 1回目の結果を捨てず、2回目は「空欄だけ」を補完するので、読めていた値は壊さない。
   const missingTagKeys=['brand','size','price','productCode','janCode','material'].filter(k=>!String(a[k]??'').trim());
-  if(tag && (missingTagKeys.includes('brand') || missingTagKeys.length>=2)){
+  if(tag && missingTagKeys.length>=2){
    $('aiStatus').textContent='タグの細かい文字を再確認しています…';
    try{
     const rr=await fetch(AI_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clothesImage:tag,tagImage:tag,sourceUrl})});
@@ -329,7 +326,7 @@ function editItem(id){
  if(existingImg){$('preview').src=existingImg;$('preview').style.display='block'}else{$('preview').style.display='none'}
  if(existingTag){$('tagPreview').src=existingTag;$('tagPreview').style.display='block'}else{$('tagPreview').style.display='none'}
  $('editingNotice').classList.remove('hidden');$('saveBtn').textContent='変更を保存する';$('aiStatus').textContent='';
- ['home','add','closet'].forEach(v=>$(v).classList.toggle('hidden',v!=='add'));scrollTo(0,0)
+ ['home','add','closet','coordinatePage'].forEach(v=>$(v).classList.toggle('hidden',v!=='add'));scrollTo(0,0)
 }
 function yen(n){return n?new Intl.NumberFormat('ja-JP',{style:'currency',currency:'JPY',maximumFractionDigits:0}).format(n):'価格未登録'}
 function renderItems(){
@@ -341,6 +338,11 @@ function renderSummary(){
  let c=items.filter(x=>x.mode==='candidate'),total=c.reduce((s,x)=>s+x.price,0);
  $('todaySummary').innerHTML=c.length?`<b>${c.length}点</b>の試着候補　合計 <b>${yen(total)}</b><br><span class="tiny">${c.slice(0,4).map(x=>esc(x.brand)+' '+esc(x.category)).join(' / ')}</span>`:'まだ商品がありません'
 }
+let coordSelected=[];
+function renderCoordPicker(){coordSelected=[];let box=$('coordItems');if(!items.length){box.innerHTML='<div class=empty style=\"grid-column:1/-1\">まず服を登録してください</div>';return}box.innerHTML=items.map(x=>`<div class=\"item pick\" id=\"pick${x.id}\" onclick=\"toggleCoord(${x.id})\">${x.img?`<img src=\"${x.img}\">`:'<div style=\"aspect-ratio:1;background:#eee;display:grid;place-items:center;font-size:40px\">👕</div>'}<div class=\"pad\"><b>${esc(x.brand||'ブランド不明')}</b><div class=\"tiny\">${esc(x.category)} ${esc(x.color||'')}</div></div></div>`).join('')}
+function toggleCoord(id){let i=coordSelected.indexOf(id);if(i>=0)coordSelected.splice(i,1);else{if(coordSelected.length>=4){alert('プロト版は最大4点です');return}coordSelected.push(id)}$('pick'+id)?.classList.toggle('selected',coordSelected.includes(id))}
+function buildLook(){let chosen=coordSelected.map(id=>items.find(x=>x.id===id)).filter(Boolean);if(chosen.length<2){alert('2点以上選んでください');return}let dna=styleDNA(chosen);let imgs=chosen.filter(x=>x.img).map(x=>`<img src=\"${x.img}\">`).join('');$('lookResult').innerHTML=`<div class=\"card\"><h2>✨ コーデシミュレーション</h2><div class=\"simStage\">${imgs||'<div style=\"font-size:80px\">🧍</div>'}<b>${chosen.map(x=>esc(x.category)).join(' × ')}</b><span class=\"tiny\">PROTOTYPE：登録写真を使った着用イメージ構成</span></div></div><div class=\"card\"><h2>🧬 STYLE DNA</h2>${dna.map(d=>`<div class=\"dnaRow\"><span>${d.name}</span><span>${d.p}%</span></div><div class=\"dnaBar\"><i style=\"width:${d.p}%\"></i></div>`).join('')}<p class=\"notice\">${dna[0].reason}</p><h3>📚 実際のスタイル資料を探す</h3>${dna.slice(0,3).map(d=>`<a class=\"searchRef\" target=\"_blank\" rel=\"noopener\" href=\"https://www.google.com/search?tbm=isch&q=${encodeURIComponent(d.query)}\">🔎 ${d.name} の実例画像を見る</a>`).join('')}<p class=\"notice\">類似度はプロト版のルール評価です。今後、シルエット・素材・年代資料を使って精密化します。</p></div>`;scrollTo(0,$('lookResult').offsetTop-90)}
+function styleDNA(chosen){let cats=chosen.map(x=>x.category), colors=chosen.map(x=>(x.color||'').toLowerCase()), brands=chosen.map(x=>(x.brand||'').toLowerCase());let wide=cats.includes('パンツ'), outer=cats.includes('アウター'), sneaker=cats.includes('靴');let neutral=colors.some(c=>/グレー|gray|grey|黒|black|白|white|紺|navy|indigo/.test(c));let a=35+(wide?10:0)+(outer?8:0)+(neutral?7:0);let b=28+(sneaker?8:0)+(brands.some(b=>/gramicci|gloster/.test(b))?7:0);let c=22+(neutral?6:0);let vals=[a,b,c];let sum=vals.reduce((x,y)=>x+y,0);let ps=vals.map(v=>Math.round(v/sum*100));ps[0]+=100-ps.reduce((x,y)=>x+y,0);return [{name:'1990年代・ジャパニーズカジュアル',p:ps[0],query:'1990s Japanese casual fashion mens street style',reason:'色、カテゴリ構成、アウターとボトムスのバランスから近いスタイルを推定しています。'},{name:'1990年代・アメリカンワーク／アウトドア',p:ps[1],query:'1990s American workwear outdoor fashion men'},{name:'2010年代・ノームコア',p:ps[2],query:'2010s normcore mens fashion'}]}
 function makeCoordinate(){
  let c=items.filter(x=>x.mode==='candidate');
  if(c.length<2){$('coordinate').innerHTML='<p class="notice danger">候補を2点以上登録するとコーデできます。</p>';return}
