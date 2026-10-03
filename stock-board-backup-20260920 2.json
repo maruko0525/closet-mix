@@ -1,0 +1,153 @@
+{
+  "app": "STOCK BOARD",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-19T20:41:23.352Z",
+  "assets": [
+    {
+      "code": "0331418A",
+      "name": "eMAXIS Slim 全世界株式（オール・カントリー）",
+      "type": "fund"
+    },
+    {
+      "code": "7011.T",
+      "name": "三菱重工",
+      "type": "stock"
+    },
+    {
+      "code": "5803.T",
+      "name": "フジクラ",
+      "type": "stock"
+    },
+    {
+      "code": "8306.T",
+      "name": "三菱UFJ",
+      "type": "stock"
+    },
+    {
+      "code": "6857.T",
+      "name": "アドバンテスト",
+      "type": "stock"
+    },
+    {
+      "code": "9984.T",
+      "name": "ソフトバンクG",
+      "type": "stock"
+    },
+    {
+      "code": "03311187",
+      "name": "eMAXIS Slim米国株式（S&P500）",
+      "type": "fund"
+    },
+    {
+      "code": "998407.O",
+      "name": "日経平均株価",
+      "kind": "index"
+    }
+  ],
+  "patterns": [
+    {
+      "id": 1789811421809,
+      "name": "お気に入り巡回",
+      "seconds": 0.5,
+      "items": [
+        {
+          "code": "5803.T",
+          "name": "フジクラ",
+          "type": "stock",
+          "info": "detail",
+          "infoName": "詳細",
+          "seconds": 10,
+          "memo": ""
+        },
+        {
+          "code": "8306.T",
+          "name": "三菱UFJ",
+          "type": "stock",
+          "info": "detail",
+          "infoName": "詳細",
+          "seconds": 10,
+          "memo": ""
+        },
+        {
+          "code": "6857.T",
+          "name": "アドバンテスト",
+          "type": "stock",
+          "info": "detail",
+          "infoName": "詳細",
+          "seconds": 10,
+          "memo": ""
+        },
+        {
+          "code": "0331418A",
+          "name": "eMAXIS Slim 全世界株式（オール・カントリー）",
+          "type": "fund",
+          "info": "chart",
+          "infoName": "チャート",
+          "seconds": 10,
+          "memo": ""
+        },
+        {
+          "code": "03311187",
+          "name": "eMAXIS Slim米国株式（S&P500）",
+          "type": "fund",
+          "info": "chart",
+          "infoName": "チャート",
+          "seconds": 10,
+          "memo": ""
+        }
+      ]
+    },
+    {
+      "id": 1789850415212,
+      "name": "復旧したお気に入り巡回",
+      "seconds": 10,
+      "items": [
+        {
+          "code": "5803.T",
+          "name": "フジクラ",
+          "type": "stock",
+          "info": "detail",
+          "infoName": "詳細",
+          "seconds": 10,
+          "memo": ""
+        },
+        {
+          "code": "8306.T",
+          "name": "三菱UFJ",
+          "type": "stock",
+          "info": "detail",
+          "infoName": "詳細",
+          "seconds": 10,
+          "memo": ""
+        },
+        {
+          "code": "6857.T",
+          "name": "アドバンテスト",
+          "type": "stock",
+          "info": "detail",
+          "infoName": "詳細",
+          "seconds": 10,
+          "memo": ""
+        },
+        {
+          "code": "0331418A",
+          "name": "eMAXIS Slim 全世界株式（オール・カントリー）",
+          "type": "fund",
+          "info": "chart",
+          "infoName": "チャート",
+          "seconds": 10,
+          "memo": ""
+        },
+        {
+          "code": "03311187",
+          "name": "eMAXIS Slim米国株式（S&P500）",
+          "type": "fund",
+          "info": "chart",
+          "infoName": "チャート",
+          "seconds": 10,
+          "memo": ""
+        }
+      ]
+    }
+  ]
+}
