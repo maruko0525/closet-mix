@@ -140,6 +140,14 @@ function clearNonUserAnalysis(){
  });
  if(fieldSource.sourceUrl!=='user'){ $('sourceUrl').value='';fieldSource.sourceUrl='empty';updateProductLink(); }
 }
+function clearAnalysisForFreshRun(){
+ // 1回のAI解析を完全に独立させる。
+ // 写真・タグ・商品ページURLは入力情報なので残し、解析結果だけを必ず初期化する。
+ ['brand','category','color','size','price','code','memo'].forEach(id=>{
+  $(id).value=id==='category'?'その他':'';
+  fieldSource[id]='empty';
+ });
+}
 document.addEventListener('DOMContentLoaded',bindFieldSourceTracking);
 function go(id){
  if(id==='add' && editingId===null && !hasDraft()) resetForm(false);
@@ -281,7 +289,7 @@ async function analyzeWithAI(){
  const clothes=await currentImage('photo',existingImg);
  if(!clothes){alert('先に服の写真を選んでください 📸');return}
  const tag=await currentImage('tagPhoto',existingTag);
- clearNonUserAnalysis();
+ clearAnalysisForFreshRun();
  const sourceUrl=await resolveSourceUrl(tag);
  const btn=$('analyzeBtn');btn.disabled=true;btn.textContent='AI解析中…';$('aiStatus').textContent='写真を解析しています。少し待ってください。';
  try{
