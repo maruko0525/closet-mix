@@ -222,7 +222,7 @@ function cancelRegistration(){
  resetForm();go('closet');
 }
 function fileData(file){return new Promise(res=>{if(!file)return res('');let r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)})}
-const AI_API='https://closet-mix-api.kjkt100.workers.dev';
+const AI_API='https://closet-mix-tryon.kjkt100.workers.dev';
 const TRYON_API_KEY='closetMixTryOnApi';
 function getTryOnApi(){return localStorage.getItem(TRYON_API_KEY)||''}
 function setTryOnApi(){const now=getTryOnApi();const v=prompt('AI TRY-ON Worker のURLを入力してください',now);if(v!==null){localStorage.setItem(TRYON_API_KEY,v.trim().replace(/\/$/,''));alert(v.trim()?'TRY-ON APIを保存しました ✨':'TRY-ON API設定を消しました')}}
