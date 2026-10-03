@@ -1,0 +1,14 @@
+CLOSET MIX V6 - AI TRY-ON 初回設定
+
+1. Cloudflare Workers & Pages で新しい Worker を1つ作成
+   例: closet-mix-tryon
+2. tryon-worker.js の内容を Worker に貼り付けて Deploy
+3. Settings > Bindings で Workers AI binding を追加
+   Variable name: AI
+4. Worker の Visit を開き、version: V6 / aiBinding: true を確認
+5. CLOSET MIX のコーデ画面で「⚙️ TRY-ON API設定」を押し、
+   Worker URL（例 https://closet-mix-tryon.xxxxx.workers.dev）を1回だけ入力
+6. 服を2〜4点選び「✨ AIで本当に着せる」
+
+QR・タグ解析は従来の closet-mix-api Worker のままです。
+AI TRY-ON は完全に別Workerなので、試着機能を変更してもQR処理には影響しません。
