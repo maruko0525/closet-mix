@@ -231,9 +231,7 @@ function cancelRegistration(){
 }
 function fileData(file){return new Promise(res=>{if(!file)return res('');let r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)})}
 const AI_API='https://closet-mix-api.kjkt100.workers.dev';
-const TRYON_API_KEY='closetMixTryOnApi';
-function getTryOnApi(){return localStorage.getItem(TRYON_API_KEY)||''}
-function setTryOnApi(){const now=getTryOnApi();const v=prompt('AI TRY-ON Worker のURLを入力してください',now);if(v!==null){localStorage.setItem(TRYON_API_KEY,v.trim().replace(/\/$/,''));alert(v.trim()?'TRY-ON APIを保存しました ✨':'TRY-ON API設定を消しました')}}
+const TRYON_API='https://closet-mix-tryon.kjkt100.workers.dev';
 function setIfPresent(id,value){if(value===undefined||value===null||value==='')return;$(id).value=String(value)}
 async function detectQrFromDataUrl(dataUrl){
  if(!dataUrl)return '';
@@ -387,19 +385,18 @@ function buildLook(){
  let chosen=coordSelected.map(id=>items.find(x=>x.id===id)).filter(Boolean);if(chosen.length<2){alert('2点以上選んでください');return}
  let dna=styleDNA(chosen);
  window._lastLookChosen=chosen;
- $('lookResult').innerHTML=`<div class="card"><h2>✨ AI TRY-ON</h2><p class="notice">登録した実物写真を参照して、1体のマネキンが自然に着用した画像を生成します。</p><div id="aiTryOnResult">${mannequinHTML(chosen)}</div><button id="tryOnBtn" onclick="generateTryOn()">✨ AIで本当に着せる</button><button class="light" style="width:100%;margin-top:8px" onclick="setTryOnApi()">⚙️ TRY-ON API設定</button><b style="display:block;text-align:center;margin-top:10px">${chosen.map(x=>esc(x.category)).join(' × ')}</b></div><div class="card"><h2>🧬 STYLE DNA</h2><p class="notice">約70系統のスタイル候補から、このコーデに近いDNAを抽出しています。</p>${dna.map(d=>`<div class="dnaRow"><span>${d.name}</span><span>${d.p}%</span></div><div class="dnaBar"><i style="width:${d.p}%"></i></div>`).join('')}<p class="notice">${dna[0].reason}</p><h3>📚 実際のスタイル資料を探す</h3>${dna.slice(0,4).map(d=>`<a class="searchRef" target="_blank" rel="noopener" href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(d.query)}">🔎 ${d.name} の実例画像を見る</a>`).join('')}</div>`;scrollTo(0,$('lookResult').offsetTop-90)
+ $('lookResult').innerHTML=`<div class="card"><h2>✨ AI TRY-ON</h2><p class="notice">登録した実物写真を参照して、1体のマネキンが自然に着用した画像を生成します。</p><div id="aiTryOnResult">${mannequinHTML(chosen)}</div><button id="tryOnBtn" onclick="generateTryOn()">✨ AIで本当に着せる</button><b style="display:block;text-align:center;margin-top:10px">${chosen.map(x=>esc(x.category)).join(' × ')}</b></div><div class="card"><h2>🧬 STYLE DNA</h2><p class="notice">約70系統のスタイル候補から、このコーデに近いDNAを抽出しています。</p>${dna.map(d=>`<div class="dnaRow"><span>${d.name}</span><span>${d.p}%</span></div><div class="dnaBar"><i style="width:${d.p}%"></i></div>`).join('')}<p class="notice">${dna[0].reason}</p><h3>📚 実際のスタイル資料を探す</h3>${dna.slice(0,4).map(d=>`<a class="searchRef" target="_blank" rel="noopener" href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(d.query)}">🔎 ${d.name} の実例画像を見る</a>`).join('')}</div>`;scrollTo(0,$('lookResult').offsetTop-90)
 }
 async function dataUrlUnder512(dataUrl,max=480){
  return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>{let w=im.naturalWidth,h=im.naturalHeight,sc=Math.min(1,max/Math.max(w,h));w=Math.max(1,Math.round(w*sc));h=Math.max(1,Math.round(h*sc));const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);resolve(c.toDataURL('image/jpeg',0.82))};im.onerror=reject;im.src=dataUrl})
 }
 async function generateTryOn(){
  const chosen=(window._lastLookChosen||[]).filter(x=>x.img).slice(0,4);if(chosen.length<2){alert('画像のある服を2点以上選んでください');return}
- const api=getTryOnApi();if(!api){alert('最初の1回だけ TRY-ON API のURL設定が必要です。次の「⚙️ TRY-ON API設定」から入力してください。');return}
  const btn=$('tryOnBtn');btn.disabled=true;btn.textContent='AIが着せています…';
  try{
   const images=[];for(const x of chosen)images.push(await dataUrlUnder512(x.img));
   const payload={images,items:chosen.map(x=>({brand:x.brand||'',category:x.category||'',color:x.color||'',size:x.size||'',memo:x.memo||''}))};
-  const r=await fetch(api+'/tryon',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||d.details||('HTTP '+r.status));
+  const r=await fetch(TRYON_API+'/tryon',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||d.details||('HTTP '+r.status));
   $('aiTryOnResult').innerHTML=`<div style="background:#f4f1eb;border-radius:22px;padding:10px;text-align:center"><img src="${d.image}" alt="AI試着" style="width:100%;max-height:680px;object-fit:contain;border-radius:18px"><div class="simCaption">AI TRY-ON：登録した服を参照した生成イメージ。実物の細部は完全一致しない場合があります。</div></div>`;
  }catch(e){alert('AI試着に失敗しました：'+e.message)}finally{btn.disabled=false;btn.textContent='✨ AIでもう一度着せる'}
 }
