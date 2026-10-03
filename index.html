@@ -281,6 +281,7 @@ async function analyzeWithAI(){
  const clothes=await currentImage('photo',existingImg);
  if(!clothes){alert('先に服の写真を選んでください 📸');return}
  const tag=await currentImage('tagPhoto',existingTag);
+ clearNonUserAnalysis();
  const sourceUrl=await resolveSourceUrl(tag);
  const btn=$('analyzeBtn');btn.disabled=true;btn.textContent='AI解析中…';$('aiStatus').textContent='写真を解析しています。少し待ってください。';
  try{
