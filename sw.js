@@ -1,4 +1,4 @@
-const CACHE_NAME = 'closet-mix-v3';
+const CACHE_NAME = 'closet-mix-v5';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
