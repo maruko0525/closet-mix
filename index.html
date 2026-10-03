@@ -230,7 +230,7 @@ function cancelRegistration(){
  resetForm();go('closet');
 }
 function fileData(file){return new Promise(res=>{if(!file)return res('');let r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)})}
-const AI_API='https://closet-mix-tryon.kjkt100.workers.dev';
+const AI_API='https://closet-mix-api.kjkt100.workers.dev';
 const TRYON_API_KEY='closetMixTryOnApi';
 function getTryOnApi(){return localStorage.getItem(TRYON_API_KEY)||''}
 function setTryOnApi(){const now=getTryOnApi();const v=prompt('AI TRY-ON Worker のURLを入力してください',now);if(v!==null){localStorage.setItem(TRYON_API_KEY,v.trim().replace(/\/$/,''));alert(v.trim()?'TRY-ON APIを保存しました ✨':'TRY-ON API設定を消しました')}}
@@ -298,18 +298,20 @@ async function analyzeWithAI(){
   if(!r.ok||!data.ok)throw new Error(data.error||data.details||('HTTP '+r.status));
   let a=data.analysis||{};
 
-  // タグがあるのに主要項目を取りこぼした場合だけ、タグを主画像としてもう一度読む。
-  // 1回目の結果を捨てず、2回目は「空欄だけ」を補完するので、読めていた値は壊さない。
-  const missingTagKeys=['brand','size','price','productCode','janCode','material'].filter(k=>!String(a[k]??'').trim());
-  if(tag && missingTagKeys.length>=2){
-   $('aiStatus').textContent='タグの細かい文字を再確認しています…';
+  // タグ写真がある場合は毎回タグを独立して読み直す。
+  // ブランド・サイズ・価格・品番など「タグに印字された事実」はタグ側を優先し、
+  // 前回値や服写真側の推測を持ち越さない。
+  if(tag){
+   $('aiStatus').textContent='タグの細かい文字を確認しています…';
    try{
     const rr=await fetch(AI_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clothesImage:tag,tagImage:tag,sourceUrl})});
     const dd=await rr.json().catch(()=>({}));
     if(rr.ok&&dd.ok&&dd.analysis){
      const b=dd.analysis;
-     const keys=['brand','productName','category','color','colorCode','size','price','productCode','janCode','material','maker','countryOfOrigin','pattern','season','features','description'];
-     for(const k of keys){if(!String(a[k]??'').trim()&&String(b[k]??'').trim())a[k]=b[k]}
+     const tagPriority=['brand','size','price','productCode','janCode','material','maker','countryOfOrigin'];
+     for(const k of tagPriority){if(String(b[k]??'').trim())a[k]=b[k]}
+     const fillOnly=['productName','category','color','colorCode','pattern','season','features','description'];
+     for(const k of fillOnly){if(!String(a[k]??'').trim()&&String(b[k]??'').trim())a[k]=b[k]}
     }
    }catch(e){console.warn('tag detail retry skipped',e)}
   }
