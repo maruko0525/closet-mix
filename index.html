@@ -232,6 +232,7 @@ function cancelRegistration(){
 function fileData(file){return new Promise(res=>{if(!file)return res('');let r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)})}
 const AI_API='https://closet-mix-api.kjkt100.workers.dev';
 const TRYON_API='https://closet-mix-tryon.kjkt100.workers.dev';
+const OUTFIT_AI_API='https://closet-mix-outfit-ai.kjkt100.workers.dev';
 function setIfPresent(id,value){if(value===undefined||value===null||value==='')return;$(id).value=String(value)}
 async function detectQrFromDataUrl(dataUrl){
  if(!dataUrl)return '';
@@ -388,18 +389,53 @@ function buildLook(){
  const top=chosen.find(x=>/アウター|トップス|シャツ|ジャケット|ニット|Tシャツ|パーカー|ベスト/.test(x.category||''))||chosen[0];
  const bottom=chosen.find(x=>/パンツ|スカート|ズボン|デニム/.test(x.category||''))||chosen.find(x=>x.id!==top.id)||chosen[1];
  window._outfitPieces=[top,bottom];
- $('lookResult').innerHTML=`<div class="card"><h2>👕 服だけでコーデを合わせる</h2><p class="notice">AI・マネキンは使いません。登録した写真をそのまま上下に配置します。画像を指で動かして位置を調整できます。</p>
+ $('lookResult').innerHTML=`<div class="card"><h2>✨ AIで上下の服を組み合わせる</h2>
+ <p class="notice">マネキンなしで、上の服と下の服をAIが立体的に組み合わせます。元の服の色や形が保たれているか確認してください。</p>
+ <button class="dark" style="width:100%;margin:10px 0" id="aiGhostBtn" onclick="generateOutfitAI('ghost')">✨ AIで立体コーデを生成</button>
+ <button class="light" style="width:100%" id="aiFlatBtn" onclick="generateOutfitAI('flat')">比較用：平置きコーデを生成</button>
+ <p id="outfitAiStatus" class="notice">まず「AIで立体コーデを生成」を押してください。繰り返し生成できます。</p>
+ <div id="outfitAiResults" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px;margin-top:12px">
+ <div id="ghostOutfitResult" class="card" style="margin:0"><h3>✨ 立体スタイル</h3><p class="notice">まだ生成していません</p></div>
+ <div id="flatOutfitResult" class="card" style="margin:0"><h3>平置きスタイル（比較用）</h3><p class="notice">まだ生成していません</p></div></div>
+ <details style="margin-top:16px"><summary>手動で写真を上下に配置（従来の機能）</summary>
  <div class="outfitEditor"><canvas id="outfitCanvas" width="700" height="1000" style="width:100%;height:auto;display:block;background:#f4f4f4;border-radius:16px;touch-action:none"></canvas></div>
  <div class="row" style="margin-top:10px"><button id="outfitTop" class="dark" onclick="outfitSelect(0)">👕 上の服</button><button id="outfitBottom" class="light" onclick="outfitSelect(1)">👖 下の服</button></div>
  <label>選択中の服の大きさ</label><input type="range" id="outfitScale" min="35" max="220" value="100" oninput="outfitChangeScale(this.value)">
- <label>写真の左右の切り取り（背景を減らす）</label><input type="range" id="outfitCropX" min="0" max="35" value="0" oninput="outfitChangeCrop('x',this.value)">
- <label>写真の上下の切り取り（背景を減らす）</label><input type="range" id="outfitCropY" min="0" max="35" value="0" oninput="outfitChangeCrop('y',this.value)">
+ <label>写真の左右の切り取り</label><input type="range" id="outfitCropX" min="0" max="35" value="0" oninput="outfitChangeCrop('x',this.value)">
+ <label>写真の上下の切り取り</label><input type="range" id="outfitCropY" min="0" max="35" value="0" oninput="outfitChangeCrop('y',this.value)">
  <div class="row"><button class="light" onclick="outfitMove(-15,0)">←</button><button class="light" onclick="outfitMove(15,0)">→</button><button class="light" onclick="outfitMove(0,-15)">↑</button><button class="light" onclick="outfitMove(0,15)">↓</button></div>
- <div class="row"><button class="light" onclick="outfitReset()">↩️ 配置をリセット</button><button class="dark" onclick="outfitSave()">💾 コーデ画像を保存</button></div>
- <p class="notice" id="outfitStatus">画像を読み込み中…</p><b style="display:block;text-align:center;margin-top:10px">${chosen.map(x=>esc(x.category)).join(' × ')}</b></div>
+ <div class="row"><button class="light" onclick="outfitReset()">↩️ リセット</button><button class="dark" onclick="outfitSave()">💾 保存</button></div>
+ <p class="notice" id="outfitStatus">写真を読み込み中…</p></details>
+ <b style="display:block;text-align:center;margin-top:10px">${chosen.map(x=>esc(x.category)).join(' × ')}</b></div>
  <div class="card"><h2>🧬 STYLE DNA</h2><p class="notice">約70系統のスタイル候補から、このコーデに近いDNAを抽出しています。</p>${dna.map(d=>`<div class="dnaRow"><span>${d.name}</span><span>${d.p}%</span></div><div class="dnaBar"><i style="width:${d.p}%"></i></div>`).join('')}<p class="notice">${dna[0].reason}</p><h3>📚 実際のスタイル資料を探す</h3>${dna.slice(0,4).map(d=>`<a class="searchRef" target="_blank" rel="noopener" href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(d.query)}">🔎 ${d.name} の実例画像を見る</a>`).join('')}</div>`;
  outfitInit();scrollTo(0,$('lookResult').offsetTop-90)
 }
+async function generateOutfitAI(mode){
+ const pair=window._outfitPieces||[];
+ if(pair.length!==2||!pair.every(x=>x?.img)){alert('上の服と下の服の画像が必要です');return false}
+ const button=$(mode==='flat'?'aiFlatBtn':'aiGhostBtn');
+ const target=$(mode==='flat'?'flatOutfitResult':'ghostOutfitResult');
+ const title=mode==='flat'?'① 平置きスタイル':'② 立体スタイル';
+ button.disabled=true;button.textContent='AI生成中…';
+ $('outfitAiStatus').textContent=title+'を生成しています…';
+ try{
+  const images=await Promise.all(pair.map(x=>dataUrlUnder512(x.img,768)));
+  const items=pair.map(x=>({category:x.category||'',brand:x.brand||'',color:x.color||'',memo:x.memo||''}));
+  const r=await fetch(OUTFIT_AI_API+'/outfit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode,images,items})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||!d.ok||!d.image)throw new Error(d.error||'HTTP '+r.status);
+  if(!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(d.image))throw new Error('AI画像の形式が不正です');
+  target.innerHTML=`<h3>${title}</h3><img src="${d.image}" alt="${title}" style="width:100%;border-radius:12px;display:block"><p class="notice">AI生成画像（元写真との細部の違いは要確認）</p><a class="button" href="${d.image}" download="closet-mix-${mode}.${d.image.startsWith('data:image/png')?'png':'jpg'}">画像を保存</a>`;
+  $('outfitAiStatus').textContent=title+'が完成しました。';
+  return true;
+ }catch(e){console.error(e);target.innerHTML=`<h3>${title}</h3><p class="notice">生成に失敗しました：${esc(e.message)}</p>`;$('outfitAiStatus').textContent='エラー：'+e.message;return false}
+ finally{button.disabled=false;button.textContent=mode==='flat'?'比較用：平置きを再生成':'✨ AIで立体コーデを再生成'}
+}
+async function generateBothOutfits(){
+ const btn=$('aiBothBtn');btn.disabled=true;btn.textContent='2種類を生成しています…';
+ try{await generateOutfitAI('flat');await generateOutfitAI('ghost')}finally{btn.disabled=false;btn.textContent='✨ 両方まとめて再生成'}
+}
+
 let outfitState=null;
 function outfitInit(){
  const parts=window._outfitPieces||[];
