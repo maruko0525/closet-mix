@@ -385,7 +385,7 @@ function buildLook(){
  let chosen=coordSelected.map(id=>items.find(x=>x.id===id)).filter(Boolean);if(chosen.length<2){alert('2点以上選んでください');return}
  let dna=styleDNA(chosen);
  window._lastLookChosen=chosen;
- $('lookResult').innerHTML=`<div class="card"><h2>✨ AI TRY-ON</h2><p class="notice">登録した実物写真を参照して、1体のマネキンが自然に着用した画像を生成します。</p><div id="aiTryOnResult">${mannequinHTML(chosen)}</div><button id="tryOnBtn" onclick="generateTryOn()">✨ AIで本当に着せる</button><b style="display:block;text-align:center;margin-top:10px">${chosen.map(x=>esc(x.category)).join(' × ')}</b></div><div class="card"><h2>🧬 STYLE DNA</h2><p class="notice">約70系統のスタイル候補から、このコーデに近いDNAを抽出しています。</p>${dna.map(d=>`<div class="dnaRow"><span>${d.name}</span><span>${d.p}%</span></div><div class="dnaBar"><i style="width:${d.p}%"></i></div>`).join('')}<p class="notice">${dna[0].reason}</p><h3>📚 実際のスタイル資料を探す</h3>${dna.slice(0,4).map(d=>`<a class="searchRef" target="_blank" rel="noopener" href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(d.query)}">🔎 ${d.name} の実例画像を見る</a>`).join('')}</div>`;scrollTo(0,$('lookResult').offsetTop-90)
+ $('lookResult').innerHTML=`<div class="card"><h2>✨ AI TRY-ON</h2><p class="notice">登録した実物写真を参照して、1体のマネキンが自然に着用した画像を生成します。</p><div id="aiTryOnResult">${mannequinHTML(chosen)}</div><button id="tryOnBtn" onclick="generateTryOn()">✨ AIで本当に着せる</button><button id="outfitTestBtn" class="light" style="width:100%;margin-top:9px" onclick="generateOutfitFirstTryOn()">🧪 服を先に組み合わせてAI試着（実験）</button><p class="notice">実験ボタンは服写真を上下に配置した参考画像をAIへ送ります。既存のAI試着は変更しません。各実行でAI生成が発生します。</p><b style="display:block;text-align:center;margin-top:10px">${chosen.map(x=>esc(x.category)).join(' × ')}</b></div><div class="card"><h2>🧬 STYLE DNA</h2><p class="notice">約70系統のスタイル候補から、このコーデに近いDNAを抽出しています。</p>${dna.map(d=>`<div class="dnaRow"><span>${d.name}</span><span>${d.p}%</span></div><div class="dnaBar"><i style="width:${d.p}%"></i></div>`).join('')}<p class="notice">${dna[0].reason}</p><h3>📚 実際のスタイル資料を探す</h3>${dna.slice(0,4).map(d=>`<a class="searchRef" target="_blank" rel="noopener" href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(d.query)}">🔎 ${d.name} の実例画像を見る</a>`).join('')}</div>`;scrollTo(0,$('lookResult').offsetTop-90)
 }
 async function dataUrlUnder512(dataUrl,max=480){
  return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>{let w=im.naturalWidth,h=im.naturalHeight,sc=Math.min(1,max/Math.max(w,h));w=Math.max(1,Math.round(w*sc));h=Math.max(1,Math.round(h*sc));const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);resolve(c.toDataURL('image/jpeg',0.82))};im.onerror=reject;im.src=dataUrl})
@@ -433,36 +433,57 @@ async function generateTryOn(){
   const d=await r.json().catch(()=>({}));
   if(!r.ok||!d.ok)throw new Error(d.error||d.details||('HTTP '+r.status));
   if(!d.image)throw new Error('AIから画像が返されませんでした');
-  const originalImage=d.image;
-  btn.textContent='色補正前後を比較しています…';
-  let correctedImage=originalImage;
-  let correctionStatus='従来の色補正を適用しました';
-  try{correctedImage=await restoreGarmentColors(originalImage,chosen)}
-  catch(colorErr){console.warn('color restore skipped',colorErr);correctionStatus='色補正に失敗したため元画像を表示しています'}
-  $('aiTryOnResult').innerHTML=`
-   <div style="background:#f4f1eb;border-radius:22px;padding:12px;margin-top:12px">
-    <h3 style="margin:8px 0">🔍 AI着せ替え・色補正比較</h3>
-    <p class="notice">同じ1回のAI生成結果を比較しています。袖口や裾、パンツの色の違いを確認してください。</p>
-    <div style="background:white;border-radius:16px;padding:10px;margin-bottom:14px">
-     <h4 style="margin:4px 0 10px">A：AI生成直後（色補正なし）</h4>
-     <img src="${originalImage}" alt="AI生成直後" style="width:100%;max-height:680px;object-fit:contain;border-radius:12px">
-     <p class="notice">AIが生成した元画像です。</p>
-    </div>
-    <div style="background:white;border-radius:16px;padding:10px">
-     <h4 style="margin:4px 0 10px">B：従来の色補正後</h4>
-     <img src="${correctedImage}" alt="色補正後" style="width:100%;max-height:680px;object-fit:contain;border-radius:12px">
-     <p class="notice">${correctionStatus}</p>
-    </div>
-    <div style="margin-top:12px;padding:12px;background:#fff7df;border-radius:12px;font-size:13px;line-height:1.7">
-     <b>🔎 比較ポイント</b><br>
-     ① アウターの裾が青くなっていないか<br>
-     ② 袖口にパンツの色が混ざっていないか<br>
-     ③ パンツ本来の色に近いのはどちらか<br>
-     ④ マネキンの黒色が変化していないか
-    </div>
-   </div>`;
+  $('aiTryOnResult').innerHTML=`<div style="background:#f4f1eb;border-radius:22px;padding:12px;margin-top:12px;text-align:center"><img src="${d.image}" alt="AI着せ替え結果" style="width:100%;max-height:680px;object-fit:contain;border-radius:16px"><p class="notice">✨ AI着せ替え結果</p></div>`;
  }catch(e){console.error(e);alert('AI試着に失敗しました：'+e.message)}
  finally{btn.disabled=false;btn.textContent='✨ AIでもう一度着せる'}
+}
+
+// Experimental method: create one outfit reference image from the original clothing photos.
+// No segmentation or deformation is applied; this is a layout-only A/B experiment.
+function outfitPhoto(img){return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=reject;im.src=img})}
+function outfitRole(cat){if(cat==='パンツ'||cat==='スカート')return 'bottom';if(cat==='靴')return 'shoes';if(cat==='バッグ')return 'bag';if(cat==='アウター')return 'outer';return 'top'}
+async function composeOutfitReference(chosen){
+ const canvas=document.createElement('canvas');canvas.width=640;canvas.height=960;
+ const ctx=canvas.getContext('2d');ctx.fillStyle='#f5f5f3';ctx.fillRect(0,0,640,960);
+ const order={bottom:0,shoes:1,top:2,outer:3,bag:4};
+ const sorted=[...chosen].sort((a,b)=>order[outfitRole(a.category)]-order[outfitRole(b.category)]);
+ const zones={bottom:{x:160,y:405,w:320,h:450},shoes:{x:170,y:820,w:300,h:110},top:{x:178,y:135,w:284,h:350},outer:{x:130,y:95,w:380,h:440},bag:{x:475,y:315,w:145,h:230}};
+ for(const item of sorted){
+  const role=outfitRole(item.category),z=zones[role];const im=await outfitPhoto(item.img);
+  // White/background pixels remain in this experiment; no claim of cutout is made.
+  const ratio=Math.min(z.w/im.naturalWidth,z.h/im.naturalHeight);
+  const w=im.naturalWidth*ratio,h=im.naturalHeight*ratio;
+  ctx.fillStyle='#ffffff';ctx.fillRect(z.x,z.y,z.w,z.h);
+  ctx.drawImage(im,z.x+(z.w-w)/2,z.y+(z.h-h)/2,w,h);
+ }
+ return canvas.toDataURL('image/jpeg',.85);
+}
+async function generateOutfitFirstTryOn(){
+ const chosen=(window._lastLookChosen||[]).filter(x=>x.img).slice(0,4);
+ if(chosen.length<2){alert('画像のある服を2点以上選んでください');return}
+ const btn=$('outfitTestBtn'),normal=$('tryOnBtn');btn.disabled=true;normal.disabled=true;
+ btn.textContent='服を組み合わせています…';
+ try{
+  const composite=await composeOutfitReference(chosen);
+  // Existing Worker API: send a composed reference plus up to 3 individual garment references.
+  const images=[await dataUrlUnder512(composite)];
+  for(const item of chosen.slice(0,3))images.push(await dataUrlUnder512(item.img));
+  const itemsPayload=[{brand:'CLOSET MIX',category:'その他',color:'',size:'',memo:'Outfit reference: upper garments above full-length lower garments; use all garments as a complete outfit.'},...chosen.slice(0,3).map(x=>({brand:x.brand||'',category:x.category||'',color:x.color||'',size:x.size||'',memo:x.memo||''}))];
+  btn.textContent='組み合わせ画像からAI試着中…';
+  const r=await fetch(TRYON_API+'/tryon',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({images,items:itemsPayload})});
+  const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok||!d.image)throw new Error(d.error||d.details||('HTTP '+r.status));
+  const host=$('aiTryOnResult');host.innerHTML='';
+  const box=document.createElement('div');box.style.cssText='background:#f4f1eb;border-radius:22px;padding:12px;margin-top:12px';
+  const heading=document.createElement('h3');heading.textContent='🧪 先に服を組み合わせる方式（実験）';box.appendChild(heading);
+  const notice=document.createElement('p');notice.className='notice';notice.textContent='参考画像は服写真のサイズ・位置を合わせて並べたものです。背景除去はしていません。AI結果は色補正なしで表示します。';box.appendChild(notice);
+  for(const [title,src] of [['① AIへ渡した組み合わせ参考画像',composite],['② AI着せ替え結果（色補正なし）',d.image]]){
+   const card=document.createElement('div');card.style.cssText='background:white;border-radius:16px;padding:10px;margin:12px 0';
+   const h=document.createElement('h4');h.textContent=title;card.appendChild(h);
+   const image=document.createElement('img');image.src=src;image.alt=title;image.style.cssText='width:100%;max-height:680px;object-fit:contain;border-radius:12px';card.appendChild(image);box.appendChild(card);
+  }
+  host.appendChild(box);
+ }catch(e){console.error(e);alert('実験AI試着に失敗しました：'+e.message)}
+ finally{btn.disabled=false;normal.disabled=false;btn.textContent='🧪 服を先に組み合わせてAI試着（実験）'}
 }
 
 const STYLE_LIBRARY=[
