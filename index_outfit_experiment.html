@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>CLOSET MIX</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+:root{--bg:#f5f5f3;--card:#fff;--ink:#151515;--muted:#737373;--line:#e7e5e4;--accent:#111827;--soft:#eeeef0}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:var(--ink)}
+header{position:sticky;top:0;z-index:5;background:rgba(245,245,243,.92);backdrop-filter:blur(12px);padding:calc(12px + env(safe-area-inset-top)) 16px 10px;border-bottom:1px solid var(--line)}
+.brand{font-size:21px;font-weight:900;letter-spacing:.08em}.sub{font-size:12px;color:var(--muted);margin-top:2px}
+main{max-width:760px;margin:auto;padding:14px 14px 100px}.hero{background:linear-gradient(145deg,#171717,#343434);color:white;border-radius:24px;padding:22px;box-shadow:0 12px 30px #0002}
+.hero h1{font-size:27px;margin:0 0 8px}.hero p{margin:0;color:#ddd;line-height:1.55}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+button,.btn{border:0;border-radius:16px;padding:14px 12px;font-weight:750;font-size:15px;cursor:pointer}.primary{background:#fff;color:#111}.dark{background:var(--accent);color:#fff}.light{background:#fff;border:1px solid var(--line);color:#222}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:15px;margin-top:14px}.card h2{font-size:18px;margin:0 0 12px}
+input,select,textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px;background:#fff;font-size:16px;margin:5px 0 9px}
+label{font-size:12px;color:var(--muted);font-weight:700}.preview{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:16px;background:#eee;display:none}
+.items{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.item{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:white}
+.item img{width:100%;aspect-ratio:1/1;object-fit:cover;background:#eee}.item .pad{padding:10px}.tiny{font-size:12px;color:var(--muted)}.price{font-weight:850;margin-top:5px}
+.badge{display:inline-block;padding:4px 8px;background:#f1f1f1;border-radius:99px;font-size:11px;margin:3px 3px 0 0}
+.tabs{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);display:grid;grid-template-columns:repeat(4,1fr);padding:8px 8px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);z-index:10}
+.tabs button{background:none;padding:8px 2px;font-size:12px}.tabs span{display:block;font-size:21px}.hidden{display:none!important}
+.empty{text-align:center;padding:24px;color:var(--muted)}.score{font-size:42px;font-weight:900}.row{display:flex;gap:8px}.row>*{flex:1}
+.notice{font-size:12px;color:var(--muted);line-height:1.45}.danger{color:#a11}.switch{display:flex;gap:7px;margin-bottom:10px}.switch button{flex:1;padding:10px}.active{background:#111827;color:white}
+.photoActions{display:flex;gap:8px;margin:-2px 0 12px}.photoActions button{flex:1;padding:10px;font-size:13px}
+.secondaryDanger{background:#fff;border:1px solid #f0caca;color:#a11}
+.formActions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:8px}
+.editing{background:#fff7df;border:1px solid #f0d58a;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:13px;font-weight:700}
+.tagPreview{width:100%;max-height:220px;object-fit:contain;border-radius:16px;background:#eee;display:none;margin-bottom:8px}.coordGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.pick{border:2px solid transparent}.pick.selected{border-color:#111827}.simStage{min-height:420px;background:linear-gradient(#eee9e1,#fafafa);border-radius:22px;padding:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}.simStage img{width:46%;max-height:155px;object-fit:contain;filter:drop-shadow(0 6px 10px #0002)}.dnaBar{height:10px;background:#eee;border-radius:99px;overflow:hidden;margin:5px 0 12px}.dnaBar i{display:block;height:100%;background:#111827;border-radius:99px}.dnaRow{display:flex;justify-content:space-between;gap:8px;font-weight:800}.searchRef{display:block;text-decoration:none;color:#111827;background:#fff;border:1px solid var(--line);padding:12px;border-radius:14px;margin-top:8px}
+
+/* V5 mannequin simulation */
+.mannequinStage{position:relative;min-height:560px;background:linear-gradient(180deg,#f1eee8,#fbfbfa);border-radius:24px;overflow:hidden;margin-top:10px}
+.mannequinBody{position:absolute;left:50%;top:48px;transform:translateX(-50%);width:220px;height:470px}
+.mHead{position:absolute;left:86px;top:0;width:48px;height:62px;border-radius:48% 48% 44% 44%;background:#d8d3cc;box-shadow:inset -6px -5px 10px #0001}
+.mNeck{position:absolute;left:99px;top:54px;width:23px;height:30px;background:#d8d3cc}
+.mTorso{position:absolute;left:50px;top:76px;width:120px;height:190px;background:#d8d3cc;clip-path:polygon(18% 0,82% 0,100% 28%,82% 100%,18% 100%,0 28%)}
+.mArm{position:absolute;top:91px;width:28px;height:210px;background:#d8d3cc;border-radius:18px}.mArm.l{left:25px;transform:rotate(7deg)}.mArm.r{right:25px;transform:rotate(-7deg)}
+.mLeg{position:absolute;top:252px;width:45px;height:205px;background:#d8d3cc;border-radius:0 0 18px 18px}.mLeg.l{left:59px}.mLeg.r{right:59px}
+.garment{position:absolute;left:50%;transform:translateX(-50%);object-fit:contain;filter:drop-shadow(0 7px 9px #0003);z-index:4;background:#fff8;border-radius:10px;mix-blend-mode:multiply}
+.garment.top{top:112px;width:170px;height:155px}.garment.outer{top:92px;width:190px;height:210px;z-index:5}.garment.bottom{top:248px;width:145px;height:215px}.garment.skirt{top:245px;width:150px;height:145px}.garment.shoes{top:445px;width:150px;height:70px}.garment.bag{top:180px;left:73%;width:90px;height:115px;z-index:6}
+.simCaption{position:absolute;bottom:12px;left:12px;right:12px;text-align:center;font-size:12px;color:#666}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+</head>
+<body>
+<header><div class="brand">CLOSET MIX</div><div class="sub">ブランドを越えて、服をひとつのクローゼットへ。</div></header>
+<main>
+<section id="home">
+ <div class="hero">
+  <h1>今日見つけた服を、<br>その場でコーデ。</h1>
+  <p>服とタグを撮影して候補へ追加。違う店・違うブランドでも自由に組み合わせよう。</p>
+  <div class="grid"><button class="primary" onclick="go('add')">📸 服を登録</button><button class="primary" onclick="go('closet')">👕 クローゼット</button></div>
+ </div>
+ <div class="card"><h2>🛍️ 今日の候補</h2><div id="todaySummary" class="empty">まだ商品がありません</div></div>
+ <div class="card"><h2>✨ クイックコーデ</h2><p class="notice">登録した候補から組み合わせを選び、簡易スコアを表示します。</p><button class="dark" style="width:100%" onclick="makeCoordinate()">コーデを作る</button><div id="coordinate"></div></div>
+</section>
+
+<section id="add" class="hidden">
+ <div class="card">
+  <h2>📸 商品を登録</h2>
+  <div class="switch"><button id="candBtn" class="active" onclick="setMode('candidate')">試着候補</button><button id="ownBtn" class="light" onclick="setMode('owned')">購入済み</button></div>
+  <div id="editingNotice" class="editing hidden">✏️ 登録済みの服を編集中です</div>
+  <label>① 服の写真（撮影・アルバムから選択）</label><input id="photo" type="file" accept="image/*">
+  <img id="preview" class="preview">
+  <div class="photoActions"><button class="light" onclick="choosePhoto('photo')">🔄 写真を変更</button><button class="secondaryDanger" onclick="clearPhoto('photo')">🗑️ 写真を外す</button></div>
+  <label>② タグ写真（任意・撮影・アルバムから選択）</label><input id="tagPhoto" type="file" accept="image/*">
+  <img id="tagPreview" class="tagPreview">
+  <div class="photoActions"><button class="light" onclick="choosePhoto('tagPhoto')">🔄 タグを変更</button><button class="secondaryDanger" onclick="clearPhoto('tagPhoto')">🗑️ タグを外す</button></div>
+  <div id="qrStatus" class="notice" style="margin:0 0 8px"></div>
+  <label>商品ページURL（任意・QRが読めた場合は自動入力）</label><input id="sourceUrl" type="url" placeholder="https://..." oninput="updateProductLink()">
+  <button id="productLinkBtn" class="light hidden" style="width:100%;margin:-1px 0 10px" onclick="openProductPage()">🌐 Safariで商品ページを見る</button>
+  <button id="analyzeBtn" class="light" style="width:100%;margin-bottom:10px" onclick="analyzeWithAI()">✨ AIで写真を解析 / 再解析</button>
+  <div id="aiStatus" class="notice" style="margin:-2px 0 10px"></div>
+  <label>ブランド</label><input id="brand" placeholder="例：AZUL / NIKE / URBAN RESEARCH">
+  <div class="row"><div><label>カテゴリ</label><select id="category"><option>Tシャツ</option><option>シャツ</option><option>アウター</option><option>パンツ</option><option>スカート</option><option>靴</option><option>バッグ</option><option>その他</option></select></div><div><label>色</label><input id="color" placeholder="L/GRY"></div></div>
+  <div class="row"><div><label>サイズ</label><input id="size" placeholder="M"></div><div><label>価格（税込）</label><input id="price" inputmode="numeric" placeholder="3990"></div></div>
+  <label>品番 / JAN / バーコード</label><input id="code" placeholder="251JAB80-2281 / 609000026524">
+  <label>メモ</label><textarea id="memo" rows="2" placeholder="20%OFF、オーバーサイズなど"></textarea>
+  <div class="formActions">
+   <button id="saveBtn" class="dark" onclick="saveItem()">この服を登録する</button>
+   <button class="secondaryDanger" onclick="cancelRegistration()">✕ 作業を取りやめる</button>
+  </div>
+  <p class="notice">写真は後から変更・削除できます。AI解析後でも登録を取りやめられます。</p>
+ </div>
+</section>
+
+<section id="closet" class="hidden">
+ <div class="card"><h2>👕 MY CLOSET</h2><div id="items" class="items"></div></div>
+</section>
+<section id="coordinatePage" class="hidden">
+ <div class="card"><h2>🧥 コーデを作る</h2><p class="notice">登録した服をタップして組み合わせます。最大4点。</p><div id="coordItems" class="coordGrid"></div><button class="dark" style="width:100%;margin-top:12px" onclick="buildLook()">✨ このコーデを完成</button></div>
+ <div id="lookResult"></div>
+</section>
+
+</main>
+
+<nav class="tabs">
+<button onclick="go('home')"><span>🏠</span>ホーム</button>
+<button onclick="go('add')"><span>📷</span>登録</button>
+<button onclick="go('closet')"><span>👕</span>クローゼット</button>
+<button onclick="go('coordinatePage')"><span>🧬</span>コーデ</button>
+</nav>
+
+<script>
+let mode='candidate';
+let items=JSON.parse(localStorage.getItem('closetMixItems')||'[]');
+let editingId=null;
+let existingImg='';
+let existingTag='';
+let compressedPhoto='';
+let compressedTag='';
+let rawTagForQr='';
+// 各入力欄の由来を内部だけで管理: ai / user / qr / empty
+let fieldSource={brand:'empty',category:'empty',color:'empty',size:'empty',price:'empty',code:'empty',memo:'empty',sourceUrl:'empty'};
+const $=id=>document.getElementById(id);
+const trackedFields=['brand','category','color','size','price','code','memo','sourceUrl'];
+function resetFieldSources(){trackedFields.forEach(id=>fieldSource[id]='empty')}
+function markUserField(id){fieldSource[id]='user'}
+function bindFieldSourceTracking(){
+ trackedFields.forEach(id=>{
+  const el=$(id);if(!el)return;
+  const ev=(el.tagName==='SELECT')?'change':'input';
+  el.addEventListener(ev,()=>markUserField(id));
+ });
+}
+function setSourcedValue(id,value,source='ai'){
+ if(fieldSource[id]==='user')return;
+ const el=$(id);if(!el)return;
+ let v=(value===undefined||value===null)?'':String(value);
+ if(id==='category')v=v?normalizeCategory(v):'その他';
+ if(id==='price'&&v)v=v.replace(/[^0-9]/g,'');
+ el.value=v;fieldSource[id]=v?source:'empty';
+}
+function clearNonUserAnalysis(){
+ ['brand','category','color','size','price','code','memo'].forEach(id=>{
+  if(fieldSource[id]!=='user'){ $(id).value=id==='category'?'その他':''; fieldSource[id]='empty'; }
+ });
+ if(fieldSource.sourceUrl!=='user'){ $('sourceUrl').value='';fieldSource.sourceUrl='empty';updateProductLink(); }
+}
+function clearAnalysisForFreshRun(){
+ // 1回のAI解析を完全に独立させる。
+ // 写真・タグ・商品ページURLは入力情報なので残し、解析結果だけを必ず初期化する。
+ ['brand','category','color','size','price','code','memo'].forEach(id=>{
+  $(id).value=id==='category'?'その他':'';
+  fieldSource[id]='empty';
+ });
+}
+document.addEventListener('DOMContentLoaded',bindFieldSourceTracking);
+function go(id){
+ if(id==='add' && editingId===null && !hasDraft()) resetForm(false);
+ ['home','add','closet','coordinatePage'].forEach(x=>$(x).classList.toggle('hidden',x!==id));
+ if(id==='home')renderSummary();if(id==='closet')renderItems();if(id==='coordinatePage')renderCoordPicker();scrollTo(0,0)
+}
+function setMode(m){mode=m;$('candBtn').className=m==='candidate'?'active':'light';$('ownBtn').className=m==='owned'?'active':'light'}
+async function compressImageFile(file,kind='clothes'){
+ if(!file)return '';
+ const src=await fileData(file);
+ const img=new Image();
+ await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=src});
+ // タグは文字を読むため少し高解像度、服写真は保存容量優先。
+ const cfg=kind==='tag'
+  ? {max:1500,target:260*1024,startQ:.72,minQ:.42}
+  : {max:1100,target:170*1024,startQ:.68,minQ:.38};
+ let scale=Math.min(1,cfg.max/Math.max(img.naturalWidth,img.naturalHeight));
+ let w=Math.max(1,Math.round(img.naturalWidth*scale));
+ let h=Math.max(1,Math.round(img.naturalHeight*scale));
+ let quality=cfg.startQ;
+ let out='';
+ for(let pass=0;pass<8;pass++){
+  const c=document.createElement('canvas');c.width=w;c.height=h;
+  const x=c.getContext('2d');x.drawImage(img,0,0,w,h);
+  out=c.toDataURL('image/jpeg',quality);
+  const bytes=Math.round((out.length-out.indexOf(',')-1)*.75);
+  if(bytes<=cfg.target||quality<=cfg.minQ){
+   if(bytes<=cfg.target||pass>=7)return out;
+  }
+  if(quality>cfg.minQ+.05)quality=Math.max(cfg.minQ,quality-.09);
+  else {w=Math.max(480,Math.round(w*.84));h=Math.max(480,Math.round(h*.84));}
+ }
+ return out;
+}
+async function handlePhotoChange(inputId,previewId,kind){
+ const f=$(inputId).files[0];if(!f)return;
+ try{
+  if(kind==='tag'){
+   existingTag='';compressedTag='';rawTagForQr=await fileData(f);
+   clearAnalysisForNewTag();
+   $('qrStatus').textContent='タグ写真を軽量化しています…';
+   compressedTag=await compressImageFile(f,'tag');
+   $(previewId).src=compressedTag;$(previewId).style.display='block';
+   $('qrStatus').textContent='タグ写真を軽量化しました ✓ AI解析するとQRも確認します。';
+  }else{
+   existingImg='';compressedPhoto='';
+   compressedPhoto=await compressImageFile(f,'clothes');
+   $(previewId).src=compressedPhoto;$(previewId).style.display='block';
+  }
+ }catch(e){console.error(e);alert('写真の軽量化に失敗しました。別の写真で試してください。')}
+}
+$('photo').addEventListener('change',()=>handlePhotoChange('photo','preview','clothes'));
+$('tagPhoto').addEventListener('change',()=>handlePhotoChange('tagPhoto','tagPreview','tag'));
+function clearAnalysisForNewTag(){
+ clearNonUserAnalysis();
+ $('aiStatus').textContent='新しいタグに変更しました。AIが入れた前回情報だけをクリアしました。';
+}
+function choosePhoto(id){$(id).click()}
+function clearPhoto(id){
+ $(id).value='';
+ if(id==='photo'){existingImg='';compressedPhoto='';$('preview').removeAttribute('src');$('preview').style.display='none'}
+ else{existingTag='';compressedTag='';rawTagForQr='';$('tagPreview').removeAttribute('src');$('tagPreview').style.display='none';clearAnalysisForNewTag();$('qrStatus').textContent=''}
+}
+function currentImage(inputId,existing){if(inputId==='photo'&&compressedPhoto)return Promise.resolve(compressedPhoto);if(inputId==='tagPhoto'&&compressedTag)return Promise.resolve(compressedTag);return $(inputId).files[0]?compressImageFile($(inputId).files[0],inputId==='tagPhoto'?'tag':'clothes'):Promise.resolve(existing||'')}
+function hasDraft(){return !!($('photo').files[0]||$('tagPhoto').files[0]||existingImg||existingTag||['brand','color','size','price','code','memo','sourceUrl'].some(x=>$(x).value.trim()))}
+function resetForm(resetMode=true){
+ editingId=null;existingImg='';existingTag='';compressedPhoto='';compressedTag='';rawTagForQr='';
+ resetFieldSources();
+ ['brand','color','size','price','code','memo','sourceUrl'].forEach(x=>$(x).value='');
+ $('category').value='その他';
+ $('photo').value='';$('tagPhoto').value='';
+ $('preview').removeAttribute('src');$('preview').style.display='none';
+ $('tagPreview').removeAttribute('src');$('tagPreview').style.display='none';
+ $('aiStatus').textContent='';$('qrStatus').textContent='';updateProductLink();$('editingNotice').classList.add('hidden');
+ $('saveBtn').textContent='この服を登録する';
+ if(resetMode)setMode('candidate');
+}
+function cancelRegistration(){
+ if(hasDraft()&&!confirm('入力中の内容を破棄して登録を取りやめますか？'))return;
+ resetForm();go('closet');
+}
+function fileData(file){return new Promise(res=>{if(!file)return res('');let r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)})}
+const AI_API='https://closet-mix-api.kjkt100.workers.dev';
+const TRYON_API='https://closet-mix-tryon.kjkt100.workers.dev';
+function setIfPresent(id,value){if(value===undefined||value===null||value==='')return;$(id).value=String(value)}
+async function detectQrFromDataUrl(dataUrl){
+ if(!dataUrl)return '';
+ try{
+  const img=new Image();await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=dataUrl});
+  // iPhone/Safari が BarcodeDetector を持つ場合は原寸に近い画像で先に試す
+  if('BarcodeDetector' in window){
+   try{const det=new BarcodeDetector({formats:['qr_code']});const codes=await det.detect(img);for(const c of codes){const v=(c.rawValue||'').trim();if(/^https?:\/\//i.test(v))return v}}catch(e){}
+  }
+  // jsQR: 解像度・コントラスト・回転を変えて複数回試す
+  const sizes=[2200,1600,1200,900];
+  for(const max of sizes){
+   const scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+   const w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale));
+   const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(img,0,0,w,h);
+   const base=x.getImageData(0,0,w,h);
+   for(const contrast of [1,1.35,1.7]){
+    const d=new Uint8ClampedArray(base.data);
+    if(contrast!==1){for(let i=0;i<d.length;i+=4){for(let j=0;j<3;j++)d[i+j]=Math.max(0,Math.min(255,(d[i+j]-128)*contrast+128))}}
+    if(typeof jsQR==='function'){const q=jsQR(d,w,h,{inversionAttempts:'attemptBoth'});const v=(q&&q.data||'').trim();if(/^https?:\/\//i.test(v))return v}
+   }
+  }
+  return '';
+ }catch(e){console.warn('QR skipped',e);return ''}
+}
+async function resolveSourceUrl(tag){
+ let url=$('sourceUrl').value.trim();
+ if(url)return url;
+ if(!tag){$('qrStatus').textContent='QR：タグ写真なし（スキップ）';return ''}
+ $('qrStatus').textContent='QRを確認中…';
+ url=await detectQrFromDataUrl(rawTagForQr||tag);
+ if(url){$('sourceUrl').value=url;fieldSource.sourceUrl='qr';updateProductLink();$('qrStatus').textContent='QRを検出しました ✓ 商品ページも補助情報として利用します。'}
+ else $('qrStatus').textContent='QRは検出できませんでした。写真だけで解析します。';
+ return url;
+}
+function updateProductLink(){
+ const url=$('sourceUrl').value.trim();
+ const ok=/^https?:\/\//i.test(url);
+ $('productLinkBtn').classList.toggle('hidden',!ok);
+}
+function openProductPage(){
+ const url=$('sourceUrl').value.trim();
+ if(!/^https?:\/\//i.test(url)){alert('商品ページURLがありません。');return}
+ window.open(url,'_blank','noopener,noreferrer');
+}
+function normalizeCategory(value){
+ const v=String(value||'').trim();if(!v)return '';
+ const opts=[...$('category').options].map(o=>o.value);if(opts.includes(v))return v;
+ const m=[['Tシャツ',['tシャツ','tee','t-shirt','tshirt']],['シャツ',['シャツ','shirt']],['アウター',['アウター','ジャケット','コート','ブルゾン','outer','jacket','coat']],['パンツ',['パンツ','ズボン','デニム','ジーンズ','pants','trousers','jeans']],['スカート',['スカート','skirt']],['靴',['靴','シューズ','スニーカー','shoe','sneaker']],['バッグ',['バッグ','bag']]];
+ const low=v.toLowerCase();for(const [cat,keys] of m){if(keys.some(k=>low.includes(k.toLowerCase())))return cat}return 'その他';
+}
+async function analyzeWithAI(){
+ const clothes=await currentImage('photo',existingImg);
+ if(!clothes){alert('先に服の写真を選んでください 📸');return}
+ const tag=await currentImage('tagPhoto',existingTag);
+ clearAnalysisForFreshRun();
+ const sourceUrl=await resolveSourceUrl(tag);
+ const btn=$('analyzeBtn');btn.disabled=true;btn.textContent='AI解析中…';$('aiStatus').textContent='写真を解析しています。少し待ってください。';
+ try{
+  const r=await fetch(AI_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clothesImage:clothes,tagImage:tag||'',sourceUrl})});
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok||!data.ok)throw new Error(data.error||data.details||('HTTP '+r.status));
+  let a=data.analysis||{};
+
+  // タグ写真がある場合は毎回タグを独立して読み直す。
+  // ブランド・サイズ・価格・品番など「タグに印字された事実」はタグ側を優先し、
+  // 前回値や服写真側の推測を持ち越さない。
+  if(tag){
+   $('aiStatus').textContent='タグの細かい文字を確認しています…';
+   try{
+    const rr=await fetch(AI_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clothesImage:tag,tagImage:tag,sourceUrl})});
+    const dd=await rr.json().catch(()=>({}));
+    if(rr.ok&&dd.ok&&dd.analysis){
+     const b=dd.analysis;
+     const tagPriority=['brand','size','price','productCode','janCode','material','maker','countryOfOrigin'];
+     for(const k of tagPriority){if(String(b[k]??'').trim())a[k]=b[k]}
+     const fillOnly=['productName','category','color','colorCode','pattern','season','features','description'];
+     for(const k of fillOnly){if(!String(a[k]??'').trim()&&String(b[k]??'').trim())a[k]=b[k]}
+    }
+   }catch(e){console.warn('tag detail retry skipped',e)}
+  }
+
+  // AI由来の値は毎回「今回の結果」に置換。ユーザーが触った欄だけ保護する。
+  setSourcedValue('brand',a.brand,'ai');
+  setSourcedValue('category',a.category,'ai');
+  setSourcedValue('color',a.color,'ai');
+  setSourcedValue('size',a.size,'ai');
+  setSourcedValue('price',a.price,'ai');
+  setSourcedValue('code',a.productCode||a.janCode,'ai');
+  const extra=[a.material&&`素材: ${a.material}`,a.pattern&&`柄: ${a.pattern}`,a.season&&`季節: ${a.season}`,a.features,a.description].filter(Boolean).join(' / ');
+  setSourcedValue('memo',extra,'ai');
+  $('aiStatus').textContent='AI解析できました ✨ 内容を確認してから登録してください。';
+ }catch(e){
+  console.error(e);
+  $('aiStatus').textContent='AI解析に失敗しました: '+e.message;
+  alert('AI解析に失敗しました。\n'+e.message);
+ }finally{
+  btn.disabled=false;btn.textContent='✨ AIで写真を解析';
+ }
+}
+async function saveItem(){
+ let img=await currentImage('photo',existingImg);
+ let tag=await currentImage('tagPhoto',existingTag);
+ if(!img){alert('服の写真を選んでください 📸');return}
+ const data={mode,img,tag,sourceUrl:$('sourceUrl').value.trim(),brand:$('brand').value||'ブランド未設定',category:$('category').value,color:$('color').value,size:$('size').value,price:Number(($('price').value||'0').replace(/,/g,'')),code:$('code').value,memo:$('memo').value,_fieldSources:{...fieldSource}};
+ let backup=[...items];
+ if(editingId!==null){
+   const i=items.findIndex(x=>x.id===editingId);
+   if(i<0){alert('編集対象が見つかりません。');return}
+   items[i]={...items[i],...data,updated:new Date().toISOString()};
+ }else{
+   items.unshift({id:Date.now(),...data,created:new Date().toISOString()});
+ }
+ try{localStorage.setItem('closetMixItems',JSON.stringify(items))}
+ catch(e){items=backup;alert('画像が大きく保存容量を超えました。写真を減らして試してください。');return}
+ const wasEdit=editingId!==null;
+ resetForm();
+ alert(wasEdit?'変更を保存しました ✨':'登録しました 👕');
+ go('closet')
+}
+function editItem(id){
+ const x=items.find(v=>v.id===id);if(!x)return;
+ editingId=id;existingImg=x.img||'';existingTag=x.tag||'';
+ setMode(x.mode||'candidate');
+ $('brand').value=x.brand||'';$('category').value=x.category||'その他';$('color').value=x.color||'';$('size').value=x.size||'';$('price').value=x.price||'';$('code').value=x.code||'';$('memo').value=x.memo||'';$('sourceUrl').value=x.sourceUrl||'';fieldSource={...fieldSource,...(x._fieldSources||{})};updateProductLink();
+ $('photo').value='';$('tagPhoto').value='';
+ if(existingImg){$('preview').src=existingImg;$('preview').style.display='block'}else{$('preview').style.display='none'}
+ if(existingTag){$('tagPreview').src=existingTag;$('tagPreview').style.display='block'}else{$('tagPreview').style.display='none'}
+ $('editingNotice').classList.remove('hidden');$('saveBtn').textContent='変更を保存する';$('aiStatus').textContent='';
+ ['home','add','closet','coordinatePage'].forEach(v=>$(v).classList.toggle('hidden',v!=='add'));scrollTo(0,0)
+}
+function yen(n){return n?new Intl.NumberFormat('ja-JP',{style:'currency',currency:'JPY',maximumFractionDigits:0}).format(n):'価格未登録'}
+function renderItems(){
+ if(!items.length){$('items').innerHTML='<div class="empty" style="grid-column:1/-1">まだ服がありません</div>';return}
+ $('items').innerHTML=items.map(x=>`<div class="item">${x.img?`<img src="${x.img}">`:`<div style="aspect-ratio:1;background:#eee;display:grid;place-items:center;font-size:40px">👕</div>`}<div class="pad"><b>${esc(x.brand)}</b><div class="tiny">${esc(x.category)} ${esc(x.color||'')}</div><span class="badge">${x.mode==='candidate'?'試着候補':'購入済み'}</span>${x.size?`<span class="badge">${esc(x.size)}</span>`:''}<div class="price">${yen(x.price)}</div>${x.sourceUrl?`<button class="light" style="width:100%;padding:8px;margin-top:8px" onclick="window.open(\'${escJs(x.sourceUrl)}\',\'_blank\',\'noopener,noreferrer\')">🌐 商品ページ</button>`:''}<div class="row" style="margin-top:8px"><button class="light" style="padding:8px" onclick="editItem(${x.id})">✏️ 編集</button><button class="secondaryDanger" style="padding:8px" onclick="del(${x.id})">削除</button></div></div></div>`).join('')
+}
+function del(id){if(confirm('この服を削除しますか？')){items=items.filter(x=>x.id!==id);localStorage.setItem('closetMixItems',JSON.stringify(items));renderItems();renderSummary()}}
+function renderSummary(){
+ let c=items.filter(x=>x.mode==='candidate'),total=c.reduce((s,x)=>s+x.price,0);
+ $('todaySummary').innerHTML=c.length?`<b>${c.length}点</b>の試着候補　合計 <b>${yen(total)}</b><br><span class="tiny">${c.slice(0,4).map(x=>esc(x.brand)+' '+esc(x.category)).join(' / ')}</span>`:'まだ商品がありません'
+}
+let coordSelected=[];
+function renderCoordPicker(){coordSelected=[];let box=$('coordItems');if(!items.length){box.innerHTML='<div class=empty style=\"grid-column:1/-1\">まず服を登録してください</div>';return}box.innerHTML=items.map(x=>`<div class=\"item pick\" id=\"pick${x.id}\" onclick=\"toggleCoord(${x.id})\">${x.img?`<img src=\"${x.img}\">`:'<div style=\"aspect-ratio:1;background:#eee;display:grid;place-items:center;font-size:40px\">👕</div>'}<div class=\"pad\"><b>${esc(x.brand||'ブランド不明')}</b><div class=\"tiny\">${esc(x.category)} ${esc(x.color||'')}</div></div></div>`).join('')}
+function toggleCoord(id){let i=coordSelected.indexOf(id);if(i>=0)coordSelected.splice(i,1);else{if(coordSelected.length>=4){alert('プロト版は最大4点です');return}coordSelected.push(id)}$('pick'+id)?.classList.toggle('selected',coordSelected.includes(id))}
+function mannequinHTML(chosen){
+ const cls=x=>x.category==='アウター'?'outer':(['パンツ'].includes(x.category)?'bottom':x.category==='スカート'?'skirt':x.category==='靴'?'shoes':x.category==='バッグ'?'bag':'top');
+ const garments=chosen.filter(x=>x.img).map(x=>`<img class="garment ${cls(x)}" src="${x.img}" alt="${esc(x.category)}">`).join('');
+ return `<div class="mannequinStage"><div class="mannequinBody"><div class="mHead"></div><div class="mNeck"></div><div class="mTorso"></div><div class="mArm l"></div><div class="mArm r"></div><div class="mLeg l"></div><div class="mLeg r"></div>${garments}</div><div class="simCaption">PROTOTYPE：登録写真をマネキン位置に自動配置。次段階で輪郭切抜き・変形精度を上げます。</div></div>`;
+}
+function buildLook(){
+ let chosen=coordSelected.map(id=>items.find(x=>x.id===id)).filter(Boolean);if(chosen.length<2){alert('2点以上選んでください');return}
+ let dna=styleDNA(chosen);
+ window._lastLookChosen=chosen;
+ $('lookResult').innerHTML=`<div class="card"><h2>✨ AI TRY-ON</h2><p class="notice">登録した実物写真を参照して、1体のマネキンが自然に着用した画像を生成します。</p><div id="aiTryOnResult">${mannequinHTML(chosen)}</div><button id="tryOnBtn" onclick="generateTryOn()">✨ AIで本当に着せる</button><button id="outfitTestBtn" class="light" style="width:100%;margin-top:9px" onclick="generateOutfitFirstTryOn()">🧪 服を先に組み合わせてAI試着（実験）</button><p class="notice">実験ボタンは服写真を上下に配置した参考画像をAIへ送ります。既存のAI試着は変更しません。各実行でAI生成が発生します。</p><b style="display:block;text-align:center;margin-top:10px">${chosen.map(x=>esc(x.category)).join(' × ')}</b></div><div class="card"><h2>🧬 STYLE DNA</h2><p class="notice">約70系統のスタイル候補から、このコーデに近いDNAを抽出しています。</p>${dna.map(d=>`<div class="dnaRow"><span>${d.name}</span><span>${d.p}%</span></div><div class="dnaBar"><i style="width:${d.p}%"></i></div>`).join('')}<p class="notice">${dna[0].reason}</p><h3>📚 実際のスタイル資料を探す</h3>${dna.slice(0,4).map(d=>`<a class="searchRef" target="_blank" rel="noopener" href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(d.query)}">🔎 ${d.name} の実例画像を見る</a>`).join('')}</div>`;scrollTo(0,$('lookResult').offsetTop-90)
+}
+async function dataUrlUnder512(dataUrl,max=480){
+ return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>{let w=im.naturalWidth,h=im.naturalHeight,sc=Math.min(1,max/Math.max(w,h));w=Math.max(1,Math.round(w*sc));h=Math.max(1,Math.round(h*sc));const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);resolve(c.toDataURL('image/jpeg',0.82))};im.onerror=reject;im.src=dataUrl})
+}
+function rgbToHsl(r,g,b){
+ r/=255;g/=255;b/=255;const max=Math.max(r,g,b),min=Math.min(r,g,b);let h=0,s=0,l=(max+min)/2;
+ if(max!==min){const d=max-min;s=l>.5?d/(2-max-min):d/(max+min);switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;default:h=(r-g)/d+4}h/=6}return[h,s,l]
+}
+function hslToRgb(h,s,l){
+ let r,g,b;if(s===0){r=g=b=l}else{const hue=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p};const q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;r=hue(p,q,h+1/3);g=hue(p,q,h);b=hue(p,q,h-1/3)}return[Math.round(r*255),Math.round(g*255),Math.round(b*255)]
+}
+async function imageToCanvas(dataUrl,max=420){
+ return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>{const sc=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight)),w=Math.max(1,Math.round(im.naturalWidth*sc)),h=Math.max(1,Math.round(im.naturalHeight*sc));const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d',{willReadFrequently:true}).drawImage(im,0,0,w,h);resolve(c)};im.onerror=reject;im.src=dataUrl})
+}
+async function dominantGarmentTone(dataUrl){
+ const c=await imageToCanvas(dataUrl,360),x=c.getContext('2d',{willReadFrequently:true}),d=x.getImageData(0,0,c.width,c.height).data;
+ const bins=new Map();
+ for(let yy=Math.floor(c.height*.08);yy<c.height*.94;yy+=2){for(let xx=Math.floor(c.width*.12);xx<c.width*.88;xx+=2){const i=(yy*c.width+xx)*4,r=d[i],g=d[i+1],b=d[i+2],mx=Math.max(r,g,b),mn=Math.min(r,g,b),lum=(r+g+b)/3;if(lum>244||lum<12)continue;const sat=mx===0?0:(mx-mn)/mx;const qr=Math.round(r/24)*24,qg=Math.round(g/24)*24,qb=Math.round(b/24)*24,key=`${qr},${qg},${qb}`;const center=1-Math.min(1,Math.hypot(xx-c.width/2,yy-c.height/2)/Math.hypot(c.width/2,c.height/2));const weight=.5+center+(sat>.08?.45:0);const z=bins.get(key)||{w:0,r:0,g:0,b:0,n:0};z.w+=weight;z.r+=r;z.g+=g;z.b+=b;z.n++;bins.set(key,z)}}
+ const best=[...bins.values()].sort((a,b)=>b.w-a.w)[0];if(!best)return null;const r=best.r/best.n,g=best.g/best.n,b=best.b/best.n,[h,s,l]=rgbToHsl(r,g,b);return{r,g,b,h,s,l}
+}
+function categoryZone(category){
+ if(category==='パンツ'||category==='スカート')return{y0:.43,y1:.91};
+ if(category==='靴')return{y0:.82,y1:.99};
+ if(category==='バッグ')return{y0:.20,y1:.78};
+ return{y0:.13,y1:.62};
+}
+async function restoreGarmentColors(generated,chosen){
+ const c=await imageToCanvas(generated,1024),x=c.getContext('2d',{willReadFrequently:true}),img=x.getImageData(0,0,c.width,c.height),d=img.data;
+ const corner=[[8,8],[c.width-9,8],[8,c.height-9],[c.width-9,c.height-9]].map(([px,py])=>{const i=(py*c.width+px)*4;return[d[i],d[i+1],d[i+2]]});
+ const bg=corner.reduce((a,v)=>[a[0]+v[0]/4,a[1]+v[1]/4,a[2]+v[2]/4],[0,0,0]);
+ for(const item of chosen){if(!item.img)continue;const tone=await dominantGarmentTone(item.img);if(!tone)continue;const z=categoryZone(item.category),y0=Math.floor(c.height*z.y0),y1=Math.floor(c.height*z.y1),x0=Math.floor(c.width*.16),x1=Math.floor(c.width*.84);
+  for(let yy=y0;yy<y1;yy++){for(let xx=x0;xx<x1;xx++){const i=(yy*c.width+xx)*4,r=d[i],g=d[i+1],b=d[i+2],lum=(r+g+b)/3;if(lum<34)continue;const bgDist=Math.hypot(r-bg[0],g-bg[1],b-bg[2]);if(bgDist<24)continue;const [h,s,l]=rgbToHsl(r,g,b);if(l>.92&&s<.10)continue;const targetS=Math.max(.04,Math.min(.9,tone.s));const mixedS=s*.22+targetS*.78;const mixedH=tone.s<.035?h:tone.h;const [nr,ng,nb]=hslToRgb(mixedH,mixedS,l);d[i]=nr;d[i+1]=ng;d[i+2]=nb;}}
+ }
+ x.putImageData(img,0,0);return c.toDataURL('image/jpeg',.92)
+}
+
+async function generateTryOn(){
+ const chosen=(window._lastLookChosen||[]).filter(x=>x.img).slice(0,4);
+ if(chosen.length<2){alert('画像のある服を2点以上選んでください');return}
+ const btn=$('tryOnBtn');btn.disabled=true;btn.textContent='AIが着せています…';
+ try{
+  const images=[];for(const x of chosen)images.push(await dataUrlUnder512(x.img));
+  const payload={images,items:chosen.map(x=>({brand:x.brand||'',category:x.category||'',color:x.color||'',size:x.size||'',memo:x.memo||''}))};
+  const r=await fetch(TRYON_API+'/tryon',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||!d.ok)throw new Error(d.error||d.details||('HTTP '+r.status));
+  if(!d.image)throw new Error('AIから画像が返されませんでした');
+  const originalImage=d.image;
+  btn.textContent='色補正前後を比較しています…';
+  let correctedImage=originalImage;
+  let correctionStatus='従来の色補正を適用しました';
+  try{correctedImage=await restoreGarmentColors(originalImage,chosen)}
+  catch(colorErr){console.warn('color restore skipped',colorErr);correctionStatus='色補正に失敗したため元画像を表示しています'}
+  $('aiTryOnResult').innerHTML=`
+   <div style="background:#f4f1eb;border-radius:22px;padding:12px;margin-top:12px">
+    <h3 style="margin:8px 0">🔍 AI着せ替え・色補正比較</h3>
+    <p class="notice">同じ1回のAI生成結果を比較しています。袖口や裾、パンツの色の違いを確認してください。</p>
+    <div style="background:white;border-radius:16px;padding:10px;margin-bottom:14px">
+     <h4 style="margin:4px 0 10px">A：AI生成直後（色補正なし）</h4>
+     <img src="${originalImage}" alt="AI生成直後" style="width:100%;max-height:680px;object-fit:contain;border-radius:12px">
+     <p class="notice">AIが生成した元画像です。</p>
+    </div>
+    <div style="background:white;border-radius:16px;padding:10px">
+     <h4 style="margin:4px 0 10px">B：従来の色補正後</h4>
+     <img src="${correctedImage}" alt="色補正後" style="width:100%;max-height:680px;object-fit:contain;border-radius:12px">
+     <p class="notice">${correctionStatus}</p>
+    </div>
+    <div style="margin-top:12px;padding:12px;background:#fff7df;border-radius:12px;font-size:13px;line-height:1.7">
+     <b>🔎 比較ポイント</b><br>
+     ① アウターの裾が青くなっていないか<br>
+     ② 袖口にパンツの色が混ざっていないか<br>
+     ③ パンツ本来の色に近いのはどちらか<br>
+     ④ マネキンの黒色が変化していないか
+    </div>
+   </div>`;
+ }catch(e){console.error(e);alert('AI試着に失敗しました：'+e.message)}
+ finally{btn.disabled=false;btn.textContent='✨ AIでもう一度着せる'}
+}
+
+
+// Experimental method: create one outfit reference image from the original clothing photos.
+// No segmentation or deformation is applied; this is a layout-only A/B experiment.
+function outfitPhoto(img){return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=reject;im.src=img})}
+function outfitRole(cat){if(cat==='パンツ'||cat==='スカート')return 'bottom';if(cat==='靴')return 'shoes';if(cat==='バッグ')return 'bag';if(cat==='アウター')return 'outer';return 'top'}
+async function composeOutfitReference(chosen){
+ const canvas=document.createElement('canvas');canvas.width=640;canvas.height=960;
+ const ctx=canvas.getContext('2d');ctx.fillStyle='#f5f5f3';ctx.fillRect(0,0,640,960);
+ const order={bottom:0,shoes:1,top:2,outer:3,bag:4};
+ const sorted=[...chosen].sort((a,b)=>order[outfitRole(a.category)]-order[outfitRole(b.category)]);
+ const zones={bottom:{x:160,y:405,w:320,h:450},shoes:{x:170,y:820,w:300,h:110},top:{x:178,y:135,w:284,h:350},outer:{x:130,y:95,w:380,h:440},bag:{x:475,y:315,w:145,h:230}};
+ for(const item of sorted){
+  const role=outfitRole(item.category),z=zones[role];const im=await outfitPhoto(item.img);
+  // White/background pixels remain in this experiment; no claim of cutout is made.
+  const ratio=Math.min(z.w/im.naturalWidth,z.h/im.naturalHeight);
+  const w=im.naturalWidth*ratio,h=im.naturalHeight*ratio;
+  ctx.fillStyle='#ffffff';ctx.fillRect(z.x,z.y,z.w,z.h);
+  ctx.drawImage(im,z.x+(z.w-w)/2,z.y+(z.h-h)/2,w,h);
+ }
+ return canvas.toDataURL('image/jpeg',.85);
+}
+async function generateOutfitFirstTryOn(){
+ const chosen=(window._lastLookChosen||[]).filter(x=>x.img).slice(0,4);
+ if(chosen.length<2){alert('画像のある服を2点以上選んでください');return}
+ const btn=$('outfitTestBtn'),normal=$('tryOnBtn');btn.disabled=true;normal.disabled=true;
+ btn.textContent='服を組み合わせています…';
+ try{
+  const composite=await composeOutfitReference(chosen);
+  // Existing Worker API: send a composed reference plus up to 3 individual garment references.
+  const images=[await dataUrlUnder512(composite)];
+  for(const item of chosen.slice(0,3))images.push(await dataUrlUnder512(item.img));
+  const itemsPayload=[{brand:'CLOSET MIX',category:'その他',color:'',size:'',memo:'Outfit reference: upper garments above full-length lower garments; use all garments as a complete outfit.'},...chosen.slice(0,3).map(x=>({brand:x.brand||'',category:x.category||'',color:x.color||'',size:x.size||'',memo:x.memo||''}))];
+  btn.textContent='組み合わせ画像からAI試着中…';
+  const r=await fetch(TRYON_API+'/tryon',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({images,items:itemsPayload})});
+  const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok||!d.image)throw new Error(d.error||d.details||('HTTP '+r.status));
+  const host=$('aiTryOnResult');host.innerHTML='';
+  const box=document.createElement('div');box.style.cssText='background:#f4f1eb;border-radius:22px;padding:12px;margin-top:12px';
+  const heading=document.createElement('h3');heading.textContent='🧪 先に服を組み合わせる方式（実験）';box.appendChild(heading);
+  const notice=document.createElement('p');notice.className='notice';notice.textContent='参考画像は服写真のサイズ・位置を合わせて並べたものです。背景除去はしていません。AI結果は色補正なしで表示します。';box.appendChild(notice);
+  for(const [title,src] of [['① AIへ渡した組み合わせ参考画像',composite],['② AI着せ替え結果（色補正なし）',d.image]]){
+   const card=document.createElement('div');card.style.cssText='background:white;border-radius:16px;padding:10px;margin:12px 0';
+   const h=document.createElement('h4');h.textContent=title;card.appendChild(h);
+   const image=document.createElement('img');image.src=src;image.alt=title;image.style.cssText='width:100%;max-height:680px;object-fit:contain;border-radius:12px';card.appendChild(image);box.appendChild(card);
+  }
+  host.appendChild(box);
+ }catch(e){console.error(e);alert('実験AI試着に失敗しました：'+e.message)}
+ finally{btn.disabled=false;normal.disabled=false;btn.textContent='🧪 服を先に組み合わせてAI試着（実験）'}
+}
+
+const STYLE_LIBRARY=[
+['1950年代・ロカビリー','1950s rockabilly mens fashion'],['1950年代・アイビー','1950s ivy league mens fashion'],['1960年代・モッズ','1960s mod mens fashion'],['1960年代・アイビールック','1960s ivy look japan men'],['1970年代・ヒッピー','1970s hippie mens fashion'],['1970年代・ディスコ','1970s disco mens fashion'],['1970年代・アメカジ','1970s american casual mens'],['1980年代・プレッピー','1980s preppy mens fashion'],['1980年代・スポーツMIX','1980s sportswear mens fashion'],['1980年代・DCブランド','1980s japanese designer fashion men'],['1990年代・ジャパニーズカジュアル','1990s Japanese casual fashion mens street style'],['1990年代・アメリカンワーク','1990s American workwear men'],['1990年代・アウトドア','1990s outdoor fashion men'],['1990年代・グランジ','1990s grunge mens fashion'],['1990年代・スケーター','1990s skater mens fashion'],['1990年代・ヒップホップ','1990s hip hop mens fashion'],['1990年代・ストリート','1990s streetwear men'],['1990年代・裏原','1990s urahara fashion men'],['2000年代・Y2K','2000s Y2K mens fashion'],['2000年代・お兄系','2000s japanese onii kei fashion'],['2000年代・スケート','2000s skate fashion men'],['2000年代・ミリタリーMIX','2000s military mix mens fashion'],['2010年代・ノームコア','2010s normcore mens fashion'],['2010年代・ミニマル','2010s minimal mens fashion'],['2010年代・アスレジャー','2010s athleisure mens fashion'],['2010年代・ストリート','2010s streetwear men'],['2020年代・シティボーイ','2020s city boy fashion japan'],['2020年代・ゴープコア','gorpcore mens fashion'],['2020年代・テックウェア','techwear mens fashion'],['2020年代・韓国ストリート','korean street fashion men'],['2020年代・クワイエットラグジュアリー','quiet luxury mens fashion'],['2020年代・オールドマネー','old money mens fashion'],['アメカジ','amekaji mens fashion'],['フレンチカジュアル','french casual mens fashion'],['ブリティッシュカジュアル','british casual mens fashion'],['イタリアンクラシコ','italian classic mens fashion'],['トラッド','traditional mens fashion'],['プレッピー','preppy mens fashion'],['アイビー','ivy style mens fashion'],['ワークウェア','workwear mens fashion'],['ミリタリー','military mens fashion'],['アウトドア','outdoor mens fashion'],['サーフ','surf mens fashion'],['スケーター','skater mens fashion'],['ストリート','streetwear men'],['スポーツMIX','sports mix mens fashion'],['ヒップホップ','hip hop mens fashion'],['パンク','punk mens fashion'],['グランジ','grunge mens fashion'],['ロック','rock mens fashion'],['モード','mode fashion men japan'],['ミニマル','minimal mens fashion'],['ノームコア','normcore mens fashion'],['シティボーイ','city boy mens fashion'],['古着MIX','vintage mix mens fashion japan'],['ヴィンテージアメリカン','vintage american mens fashion'],['デニムスタイル','denim mens style'],['モノトーン','monochrome mens fashion'],['オールブラック','all black mens fashion'],['ナチュラル','natural mens fashion'],['リラックス','relaxed mens fashion'],['オーバーサイズ','oversized mens fashion'],['スマートカジュアル','smart casual men'],['ビジカジ','business casual men japan'],['スポーティ','sporty mens fashion'],['ゴープコア','gorpcore outfit men'],['テック','technical fashion men'],['韓国ミニマル','korean minimal mens fashion'],['北欧ミニマル','scandinavian minimal mens fashion'],['ジェンダーレス','genderless fashion men japan']
+];
+function styleDNA(chosen){
+ const text=chosen.map(x=>[x.brand,x.category,x.color,x.memo].join(' ')).join(' ').toLowerCase();
+ const cats=chosen.map(x=>x.category), neutral=/グレー|gray|grey|黒|black|白|white|紺|navy|indigo/.test(text), denim=/デニム|denim|indigo/.test(text), outdoor=/gramicci|gloster|ナイロン|nylon|アウトドア/.test(text);
+ const scores=STYLE_LIBRARY.map((s,i)=>{let v=10+((i*17+chosen.length*13)%19);const n=s[0];if(neutral&&/ノーム|ミニマル|シティ|モノトーン|テック|韓国/.test(n))v+=18;if(denim&&/アメカジ|デニム|ヴィンテージ|1990/.test(n))v+=22;if(outdoor&&/アウトドア|ゴープ|ワーク|1990|シティ/.test(n))v+=25;if(cats.includes('アウター')&&/ワーク|アウトドア|ストリート|シティ/.test(n))v+=12;if(cats.includes('パンツ')&&/カジュアル|ワーク|ノーム|シティ|スケーター/.test(n))v+=8;return {name:s[0],query:s[1],score:v}}).sort((a,b)=>b.score-a.score).slice(0,5);
+ const total=scores.reduce((a,b)=>a+b.score,0);let ps=scores.map(x=>Math.max(1,Math.round(x.score/total*100)));ps[0]+=100-ps.reduce((a,b)=>a+b,0);
+ return scores.map((x,i)=>({...x,p:ps[i],reason:i===0?'年代・色・カテゴリ・素材・ブランド情報を組み合わせて、約70系統から近いスタイルを比較しています。':''}));
+}
+function makeCoordinate(){
+ let c=items.filter(x=>x.mode==='candidate');
+ if(c.length<2){$('coordinate').innerHTML='<p class="notice danger">候補を2点以上登録するとコーデできます。</p>';return}
+ let chosen=[];let used=new Set();
+ for(let x of c){if(!used.has(x.category)){chosen.push(x);used.add(x.category)}if(chosen.length>=4)break}
+ if(chosen.length<2)chosen=c.slice(0,Math.min(4,c.length));
+ let score=Math.min(96,72+chosen.length*6);
+ $('coordinate').innerHTML=`<div class="card"><div class="score">${score}<small style="font-size:16px"> / 100</small></div><b>ブランド横断コーデ</b><p>${chosen.map(x=>esc(x.brand)+' '+esc(x.category)).join(' ＋ ')}</p><p class="notice">V1のスコアはカテゴリ構成によるデモ評価です。</p></div>`
+}
+function escJs(s=''){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
+function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+renderSummary();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js')
+    .catch(err => console.error('Service Worker error:', err));
+}
+</script>
+</body>
+</html>
