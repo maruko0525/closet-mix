@@ -423,16 +423,46 @@ async function restoreGarmentColors(generated,chosen){
 }
 
 async function generateTryOn(){
- const chosen=(window._lastLookChosen||[]).filter(x=>x.img).slice(0,4);if(chosen.length<2){alert('画像のある服を2点以上選んでください');return}
+ const chosen=(window._lastLookChosen||[]).filter(x=>x.img).slice(0,4);
+ if(chosen.length<2){alert('画像のある服を2点以上選んでください');return}
  const btn=$('tryOnBtn');btn.disabled=true;btn.textContent='AIが着せています…';
  try{
   const images=[];for(const x of chosen)images.push(await dataUrlUnder512(x.img));
   const payload={images,items:chosen.map(x=>({brand:x.brand||'',category:x.category||'',color:x.color||'',size:x.size||'',memo:x.memo||''}))};
-  const r=await fetch(TRYON_API+'/tryon',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||d.details||('HTTP '+r.status));
-  btn.textContent='元画像の色を戻しています…';
-  let finalImage=d.image;try{finalImage=await restoreGarmentColors(d.image,chosen)}catch(colorErr){console.warn('color restore skipped',colorErr)}
-  $('aiTryOnResult').innerHTML=`<div style="background:#f4f1eb;border-radius:22px;padding:10px;text-align:center"><img src="${finalImage}" alt="AI試着" style="width:100%;max-height:680px;object-fit:contain;border-radius:18px"><div class="simCaption">AI TRY-ON：FREE-6の着せ方を維持し、生成後に元写真の色相・彩度を戻しています。</div></div>`;
- }catch(e){alert('AI試着に失敗しました：'+e.message)}finally{btn.disabled=false;btn.textContent='✨ AIでもう一度着せる'}
+  const r=await fetch(TRYON_API+'/tryon',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||!d.ok)throw new Error(d.error||d.details||('HTTP '+r.status));
+  if(!d.image)throw new Error('AIから画像が返されませんでした');
+  const originalImage=d.image;
+  btn.textContent='色補正前後を比較しています…';
+  let correctedImage=originalImage;
+  let correctionStatus='従来の色補正を適用しました';
+  try{correctedImage=await restoreGarmentColors(originalImage,chosen)}
+  catch(colorErr){console.warn('color restore skipped',colorErr);correctionStatus='色補正に失敗したため元画像を表示しています'}
+  $('aiTryOnResult').innerHTML=`
+   <div style="background:#f4f1eb;border-radius:22px;padding:12px;margin-top:12px">
+    <h3 style="margin:8px 0">🔍 AI着せ替え・色補正比較</h3>
+    <p class="notice">同じ1回のAI生成結果を比較しています。袖口や裾、パンツの色の違いを確認してください。</p>
+    <div style="background:white;border-radius:16px;padding:10px;margin-bottom:14px">
+     <h4 style="margin:4px 0 10px">A：AI生成直後（色補正なし）</h4>
+     <img src="${originalImage}" alt="AI生成直後" style="width:100%;max-height:680px;object-fit:contain;border-radius:12px">
+     <p class="notice">AIが生成した元画像です。</p>
+    </div>
+    <div style="background:white;border-radius:16px;padding:10px">
+     <h4 style="margin:4px 0 10px">B：従来の色補正後</h4>
+     <img src="${correctedImage}" alt="色補正後" style="width:100%;max-height:680px;object-fit:contain;border-radius:12px">
+     <p class="notice">${correctionStatus}</p>
+    </div>
+    <div style="margin-top:12px;padding:12px;background:#fff7df;border-radius:12px;font-size:13px;line-height:1.7">
+     <b>🔎 比較ポイント</b><br>
+     ① アウターの裾が青くなっていないか<br>
+     ② 袖口にパンツの色が混ざっていないか<br>
+     ③ パンツ本来の色に近いのはどちらか<br>
+     ④ マネキンの黒色が変化していないか
+    </div>
+   </div>`;
+ }catch(e){console.error(e);alert('AI試着に失敗しました：'+e.message)}
+ finally{btn.disabled=false;btn.textContent='✨ AIでもう一度着せる'}
 }
 
 const STYLE_LIBRARY=[
