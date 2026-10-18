@@ -390,7 +390,7 @@ function buildLook(){
  const bottom=chosen.find(x=>/パンツ|スカート|ズボン|デニム/.test(x.category||''))||chosen.find(x=>x.id!==top.id)||chosen[1];
  window._outfitPieces=[top,bottom];
  $('lookResult').innerHTML=`<div class="card"><h2>✨ AIで上下の服を組み合わせる</h2>
- <p class="notice">上の服と下の服をAIが立体的に組み合わせます。元の服の色や形が保たれているか確認してください。</p>
+ <p class="notice">マネキンなしで、上の服と下の服をAIが立体的に組み合わせます。元の服の色や形が保たれているか確認してください。</p>
  <button class="dark" style="width:100%;margin:10px 0" id="aiGhostBtn" onclick="generateOutfitAI('ghost')">✨ AIで立体コーデを生成</button>
  <button class="light" style="width:100%" id="aiFlatBtn" onclick="generateOutfitAI('flat')">比較用：平置きコーデを生成</button>
  <p id="outfitAiStatus" class="notice">まず「AIで立体コーデを生成」を押してください。繰り返し生成できます。</p>
@@ -425,8 +425,7 @@ async function generateOutfitAI(mode){
   const d=await r.json().catch(()=>({}));
   if(!r.ok||!d.ok||!d.image)throw new Error(d.error||'HTTP '+r.status);
   if(!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(d.image))throw new Error('AI画像の形式が不正です');
-  target.innerHTML=`<h3>${title}</h3><img src="${d.image}" alt="${title}" style="width:100%;border-radius:12px;display:block"><p class="notice">AI生成画像（元写真との細部の違いは要確認）</p><a class="button" href="${d.image}" download="closet-mix-${mode}.${d.image.startsWith('data:image/png')?'png':'jpg'}">元画像を保存</a>${mode==='flat'?'':backgroundEditorHTML()}`;
-  if(mode!=='flat')backgroundInit(d.image);
+  target.innerHTML=`<h3>${title}</h3><img src="${d.image}" alt="${title}" style="width:100%;border-radius:12px;display:block"><p class="notice">AI生成画像（元写真との細部の違いは要確認）</p><a class="button" href="${d.image}" download="closet-mix-${mode}.${d.image.startsWith('data:image/png')?'png':'jpg'}">画像を保存</a>`;
   $('outfitAiStatus').textContent=title+'が完成しました。';
   return true;
  }catch(e){console.error(e);target.innerHTML=`<h3>${title}</h3><p class="notice">生成に失敗しました：${esc(e.message)}</p>`;$('outfitAiStatus').textContent='エラー：'+e.message;return false}
@@ -436,74 +435,6 @@ async function generateBothOutfits(){
  const btn=$('aiBothBtn');btn.disabled=true;btn.textContent='2種類を生成しています…';
  try{await generateOutfitAI('flat');await generateOutfitAI('ghost')}finally{btn.disabled=false;btn.textContent='✨ 両方まとめて再生成'}
 }
-
-
-/* CLOSET MIX 背景カスタマイズ: Workerは変更しない。元画像は保持。 */
-let bgOriginal='', bgScene=null, bgForeground=null, bgCustomUrl=null, bgMaskJob=0;
-const BG_PRESETS=[
- ['白スタジオ','backgrounds/white.jpg'],['グレースタジオ','backgrounds/gray.jpg'],
- ['黒スタジオ','backgrounds/black.jpg'],['コンクリート','backgrounds/concrete.jpg'],
- ['街角','backgrounds/street.jpg'],['公園','backgrounds/park.jpg']
-];
-function backgroundEditorHTML(){return `<details id="bgEditor" style="margin-top:14px"><summary style="font-weight:bold;cursor:pointer">🏙️ 背景を変更する（AI不使用）</summary>
- <p class="notice">元画像はそのまま保存します。背景の切り抜きは端の色を使う簡易処理です。服の輪郭が欠ける場合は「元画像」を選んでください。</p>
- <div id="bgChoices" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:10px 0"></div>
- <div class="row"><label class="button light" style="text-align:center;flex:1">📁 アルバム<input id="bgAlbum" type="file" accept="image/*" style="display:none" onchange="bgFile(this)"></label>
- <label class="button light" style="text-align:center;flex:1">📷 撮影<input id="bgCamera" type="file" accept="image/*" capture="environment" style="display:none" onchange="bgFile(this)"></label></div>
- <label>背景切り抜きの強さ：<span id="bgToleranceLabel">28</span></label><input type="range" id="bgTolerance" min="10" max="65" value="28" oninput="bgChangeTolerance(this.value)">
- <label>背景の拡大：<span id="bgZoomLabel">100%</span></label><input type="range" id="bgZoom" min="100" max="220" value="100" oninput="bgZoomChange(this.value)">
- <p class="notice">背景写真の位置はプレビュー上で指を動かして調整できます。</p>
- <canvas id="bgPreview" width="768" height="1024" style="width:100%;height:auto;border-radius:12px;touch-action:none;background:#ddd"></canvas>
- <p class="notice" id="bgStatus">背景を選んでください。</p>
- <button class="dark" style="width:100%" onclick="bgSave()">💾 背景付き画像を保存</button>
- </details>`}
-function bgLoadImage(url){return new Promise((resolve,reject)=>{let im=new Image();im.onload=()=>resolve(im);im.onerror=()=>reject(new Error('画像を読み込めません'));im.src=url})}
-function backgroundInit(image){
- bgOriginal=image;bgForeground=null;bgScene={url:null,zoom:1,x:0,y:0,original:true};
- const el=document.getElementById('bgChoices');if(!el)return;
- el.innerHTML=`<button type="button" class="light" onclick="bgSelect(null)">元画像</button>`+BG_PRESETS.map(([name,url],i)=>`<button type="button" class="light" onclick="bgSelect(${i})">${name}</button>`).join('');
- const c=document.getElementById('bgPreview');let last=null;
- c.onpointerdown=e=>{last={x:e.clientX,y:e.clientY};c.setPointerCapture(e.pointerId)};
- c.onpointermove=e=>{if(!last||!bgScene)return;const r=c.getBoundingClientRect();bgScene.x+=(e.clientX-last.x)*c.width/r.width;bgScene.y+=(e.clientY-last.y)*c.height/r.height;last={x:e.clientX,y:e.clientY};bgRender()};
- c.onpointerup=c.onpointercancel=()=>{last=null};bgRender();
-}
-async function bgSelect(i){if(!bgScene)return;bgScene.url=i===null?null:BG_PRESETS[i][1];bgScene.original=i===null;bgScene.zoom=1;bgScene.x=0;bgScene.y=0;document.getElementById('bgZoom').value=100;document.getElementById('bgZoomLabel').textContent='100%';await bgRender()}
-async function bgFile(input){const f=input.files?.[0];if(!f)return;if(!f.type.startsWith('image/')){alert('画像ファイルを選んでください');return}if(bgCustomUrl)URL.revokeObjectURL(bgCustomUrl);bgCustomUrl=URL.createObjectURL(f);bgScene.url=bgCustomUrl;bgScene.original=false;bgScene.zoom=1;bgScene.x=0;bgScene.y=0;await bgRender();input.value=''}
-function bgZoomChange(v){if(!bgScene)return;bgScene.zoom=Number(v)/100;document.getElementById('bgZoomLabel').textContent=v+'%';bgRender()}
-function bgChangeTolerance(v){document.getElementById('bgToleranceLabel').textContent=v;bgForeground=null;bgRender()}
-// 外周からつながる「背景に近い色」のみ透明化する。服の内部の色は直接消さない。
-async function bgMakeForeground(){
- const img=await bgLoadImage(bgOriginal),w=512,h=Math.round(512*img.height/img.width);
- const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d',{willReadFrequently:true});g.drawImage(img,0,0,w,h);
- const id=g.getImageData(0,0,w,h),p=id.data,seen=new Uint8Array(w*h),q=new Int32Array(w*h);let head=0,tail=0;
- const sample=(x,y)=>{const i=(y*w+x)*4;return [p[i],p[i+1],p[i+2]]};
- const corners=[sample(2,2),sample(w-3,2),sample(2,h-3),sample(w-3,h-3)];
- const median=a=>a.slice().sort((x,y)=>x-y)[1];
- const base=[0,1,2].map(k=>median(corners.map(c=>c[k])));
- const tol=Number(document.getElementById('bgTolerance')?.value||28);
- function eligible(k){const i=k*4;let d=Math.sqrt((p[i]-base[0])**2+(p[i+1]-base[1])**2+(p[i+2]-base[2])**2);return d<tol*2.2}
- function add(k){if(!seen[k]&&eligible(k)){seen[k]=1;q[tail++]=k}}
- for(let x=0;x<w;x++){add(x);add((h-1)*w+x)}for(let y=0;y<h;y++){add(y*w);add(y*w+w-1)}
- while(head<tail){const k=q[head++],x=k%w,y=(k/w)|0;if(x>0)add(k-1);if(x<w-1)add(k+1);if(y>0)add(k-w);if(y<h-1)add(k+w)}
- for(let k=0;k<w*h;k++)if(seen[k])p[k*4+3]=0;
- g.putImageData(id,0,0);return c;
-}
-async function bgRender(){
- const job=++bgMaskJob,c=document.getElementById('bgPreview');if(!c||!bgScene)return;
- const ctx=c.getContext('2d'),s={...bgScene};
- const status=document.getElementById('bgStatus');
- try{
-  if(s.original){const im=await bgLoadImage(bgOriginal);if(job!==bgMaskJob)return;ctx.clearRect(0,0,c.width,c.height);ctx.drawImage(im,0,0,c.width,c.height);status.textContent='元画像を表示中。';return}
-  status.textContent='背景を合成しています…';
-  const [bg,fg]=await Promise.all([bgLoadImage(s.url),bgForeground?Promise.resolve(bgForeground):bgMakeForeground()]);if(job!==bgMaskJob)return;
-  bgForeground=fg;ctx.clearRect(0,0,c.width,c.height);
-  const scale=Math.max(c.width/bg.width,c.height/bg.height)*s.zoom,w=bg.width*scale,h=bg.height*scale;
-  ctx.drawImage(bg,(c.width-w)/2+s.x,(c.height-h)/2+s.y,w,h);
-  ctx.drawImage(fg,0,0,c.width,c.height);
-  status.textContent='プレビュー完成。服の輪郭を確認してから保存してください。';
- }catch(e){if(job!==bgMaskJob)return;status.textContent='背景を表示できません：'+e.message}
-}
-function bgSave(){const c=document.getElementById('bgPreview');if(!c)return;const a=document.createElement('a');a.href=c.toDataURL('image/png');a.download='closet-mix-background.png';document.body.appendChild(a);a.click();a.remove()}
 
 let outfitState=null;
 function outfitInit(){
@@ -630,6 +561,106 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js')
     .catch(err => console.error('Service Worker error:', err));
 }
+</script>
+<script>
+/* CLOSET MIX: iPhone IndexedDB storage + Quick Coord v1 */
+(() => {
+'use strict';
+const DB_NAME='closet-mix-device-v1', STORE='garments';
+let dbPromise;
+function openDB(){
+ if(!dbPromise) dbPromise=new Promise((resolve,reject)=>{
+  const req=indexedDB.open(DB_NAME,1);
+  req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:'id'})};
+  req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+ });
+ return dbPromise;
+}
+async function dbAll(){const db=await openDB();return new Promise((resolve,reject)=>{const t=db.transaction(STORE,'readonly');const q=t.objectStore(STORE).getAll();q.onsuccess=()=>resolve(q.result||[]);q.onerror=()=>reject(q.error)})}
+async function dbPut(x){const db=await openDB();return new Promise((resolve,reject)=>{const t=db.transaction(STORE,'readwrite');t.objectStore(STORE).put(x);t.oncomplete=resolve;t.onerror=()=>reject(t.error);t.onabort=()=>reject(t.error)})}
+async function dbRemove(id){const db=await openDB();return new Promise((resolve,reject)=>{const t=db.transaction(STORE,'readwrite');t.objectStore(STORE).delete(id);t.oncomplete=resolve;t.onerror=()=>reject(t.error)})}
+async function refresh(){items=(await dbAll()).sort((a,b)=>(b.updated||b.created||'').localeCompare(a.updated||a.created||''));renderSummary();if(!document.getElementById('closet').classList.contains('hidden'))renderItems();}
+async function migrate(){
+ try{
+  const stored=await dbAll();
+  if(!stored.length){
+   const legacy=JSON.parse(localStorage.getItem('closetMixItems')||'[]');
+   for(const x of legacy)await dbPut(x);
+  }
+  localStorage.removeItem('closetMixItems');
+  await refresh();
+ }catch(e){console.error('IndexedDB initialization failed',e);alert('iPhone内の保存領域を開けませんでした。Safariのプライベートブラウズ設定などを確認してください。')}
+}
+// Replace localStorage-only write path. Preserve existing form, tag analysis and edit UI.
+saveItem=async function(){
+ const img=await currentImage('photo',existingImg),tag=await currentImage('tagPhoto',existingTag);
+ if(!img){alert('服の写真を選んでください 📸');return}
+ const now=new Date().toISOString(),wasEdit=editingId!==null;
+ const prev=wasEdit?items.find(v=>v.id===editingId):null;
+ if(wasEdit&&!prev){alert('編集対象が見つかりません。');return}
+ const record={...(prev||{}),id:wasEdit?editingId:Date.now(),mode,img,tag,sourceUrl:$('sourceUrl').value.trim(),brand:$('brand').value||'ブランド未設定',category:$('category').value,color:$('color').value,size:$('size').value,price:Number(($('price').value||'0').replace(/,/g,'')),code:$('code').value,memo:$('memo').value,_fieldSources:{...fieldSource},created:prev?.created||now,updated:now};
+ try{await dbPut(record);await refresh();resetForm();alert(wasEdit?'変更を保存しました ✨':'登録しました 👕');go('closet')}
+ catch(e){console.error(e);alert('保存できませんでした。iPhoneの空き容量やSafariの保存設定を確認してください。')}
+};
+del=async function(id){if(!confirm('この服を削除しますか？'))return;try{await dbRemove(id);await refresh()}catch(e){alert('削除に失敗しました：'+e.message)}};
+// Backup to Files: JSON containing image data; share/save using browser download.
+window.closetBackup=async function(){
+ try{const data={format:'CLOSET_MIX_IDB_V1',exported:new Date().toISOString(),items:await dbAll()};const blob=new Blob([JSON.stringify(data)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='closet-mix-backup-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(e){alert('バックアップに失敗しました：'+e.message)}
+};
+window.closetRestore=async function(input){
+ const file=input.files?.[0];if(!file)return;
+ try{const data=JSON.parse(await file.text());if(data.format!=='CLOSET_MIX_IDB_V1'||!Array.isArray(data.items))throw Error('CLOSET MIXのバックアップではありません');if(!confirm(`${data.items.length}着を読み込みます。続けますか？`))return;for(const x of data.items){if(!Number.isFinite(x.id))continue;await dbPut(x)}await refresh();alert('復元しました 👕')}
+ catch(e){alert('復元に失敗しました：'+e.message)}finally{input.value=''}
+};
+function addStorageButtons(){const c=document.querySelector('#closet .card');if(!c||document.getElementById('deviceStorageTools'))return;const el=document.createElement('div');el.id='deviceStorageTools';el.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px';el.innerHTML='<button class="light" onclick="closetBackup()">💾 iPhoneにバックアップ</button><label class="btn light" style="display:inline-flex;align-items:center;cursor:pointer">📂 バックアップを復元<input type="file" accept=".json,application/json" style="display:none" onchange="closetRestore(this)"></label>';c.insertBefore(el,c.querySelector('#items'))}
+function group(x){const s=[x.category,x.memo].join(' ').toLowerCase();if(/ハーフパンツ|ショートパンツ|ショーツ|shorts/.test(s))return 'ハーフパンツ';if(/パンツ|ズボン|デニム|ジーンズ/.test(s))return 'パンツ';if(/アウター|ジャケット|コート|ブルゾン|パーカー/.test(s))return 'アウター';if(/シャツ|tシャツ|t-shirt|ニット|セーター|ベスト|インナー/.test(s))return 'インナー';if(/靴|シューズ|スニーカー/.test(s))return '靴';if(/スカート/.test(s))return 'スカート';if(/バッグ/.test(s))return 'バッグ';return 'その他'}
+const slots=['アウター','インナー','パンツ','ハーフパンツ','靴','スカート','バッグ'];
+const selection={};
+const safe=esc;
+function optionsFor(slot){return items.filter(x=>group(x)===slot)}
+function updateQuickSlot(slot){
+ const col=document.getElementById('qcColor_'+slots.indexOf(slot)),sel=document.getElementById('qcItem_'+slots.indexOf(slot));if(!col||!sel)return;
+ const options=optionsFor(slot);const colors=[...new Set(options.map(x=>(x.color||'未設定').trim()))];
+ const previous=col.value;col.innerHTML='<option value="">すべての色</option>'+colors.map(v=>`<option value="${safe(v)}">${safe(v)}</option>`).join('');if(colors.includes(previous))col.value=previous;
+ const filtered=options.filter(x=>!col.value||(x.color||'未設定').trim()===col.value);
+ const before=sel.value;sel.innerHTML='<option value="">選択しない</option>'+filtered.map(x=>`<option value="${x.id}">${safe(x.brand)} / ${safe(x.color||'色未設定')} / ${safe(x.size||'')}</option>`).join('');if(filtered.some(x=>String(x.id)===before))sel.value=before;
+}
+window.qcChangeColor=function(i){updateQuickSlot(slots[i])};
+function quickUI(){
+ const el=$('coordinate');if(!el)return;
+ el.innerHTML=`<div style="margin-top:12px"><p class="notice">登録した服だけを使います。カテゴリと色で絞り込み、好きな組み合わせを何度でも試せます。</p><div id="qcSlots" style="display:grid;gap:10px"></div><button id="qcGenerate" class="dark" style="width:100%;margin-top:12px" onclick="qcMakeLook()">👕 この組み合わせを画像で確認</button><p class="notice">画像生成はAIを使用します。元写真と色・形が異なる場合があります。</p></div>`;
+ const box=document.getElementById('qcSlots');
+ box.innerHTML=slots.map((s,i)=>`<div style="background:#fafafa;border:1px solid #e7e5e4;border-radius:14px;padding:10px"><b>${safe(s)}</b><div class="row"><select id="qcColor_${i}" aria-label="${safe(s)}の色" onchange="qcChangeColor(${i})"></select><select id="qcItem_${i}" aria-label="${safe(s)}の服"></select></div></div>`).join('');
+ slots.forEach(updateQuickSlot);
+}
+window.qcMakeLook=function(){
+ const chosen=slots.map((s,i)=>items.find(x=>String(x.id)===document.getElementById('qcItem_'+i)?.value)).filter(Boolean);
+ if(chosen.length<2){alert('登録済みの服を2点以上選んでください');return}
+ const tops=chosen.filter(x=>['アウター','インナー'].includes(group(x)));
+ const bottoms=chosen.filter(x=>['パンツ','ハーフパンツ','スカート'].includes(group(x)));
+ if(!tops.length||!bottoms.length){alert('上の服と下の服をそれぞれ1点以上選んでください');return}
+ const top=tops.find(x=>group(x)==='アウター')||tops[0],bottom=bottoms[0];
+ // Preserve existing AI outfit flow. The current Worker supports one top + one bottom.
+ go('coordinatePage');
+ coordSelected=chosen.slice(0,4).map(x=>x.id);
+ coordSelected.forEach(id=>document.getElementById('pick'+id)?.classList.add('selected'));
+ buildLook();
+ window._outfitPieces=[top,bottom];
+ const flatBtn=document.getElementById('aiFlatBtn'),flatResult=document.getElementById('flatOutfitResult');
+ if(flatBtn)flatBtn.style.display='none';if(flatResult)flatResult.style.display='none';
+ generateOutfitAI('ghost');
+ const note=document.createElement('p');note.className='notice';note.textContent='画像生成は現在アウター/インナーから1点とボトムス1点を使用します。ほかの服は今後の複数レイヤー対応で反映予定です。';$('lookResult')?.firstElementChild?.prepend(note);
+};
+makeCoordinate=function(){quickUI()};
+// Keep user selections while moving between home and generated results.
+const oldGo=go;go=function(id){oldGo(id);if(id==='home'&&document.getElementById('qcSlots'))slots.forEach(updateQuickSlot)};
+const oldRenderItems=renderItems;renderItems=function(){oldRenderItems();addStorageButtons()};
+const category=$('category');if(category&&!Array.from(category.options).some(x=>x.value==='ハーフパンツ')){const o=document.createElement('option');o.value='ハーフパンツ';o.textContent='ハーフパンツ';category.add(o)}
+// Avoid stale localStorage writes from other legacy code paths.
+window.addEventListener('DOMContentLoaded',migrate);
+if(document.readyState!=='loading')migrate();
+})();
+
 </script>
 </body>
 </html>
